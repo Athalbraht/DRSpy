@@ -32,8 +32,10 @@ class Analysis():
         self.df = pd.DataFrame()
         print(f'\nFound {len(self.files)} .root files. {self.T_samples=}, {self.channels=} \n')
 
-        self.fit_params = ['L', 'CH', '$t_0$', '$t_r', '$t_f$', '$Q$', '$dV$', '$V_0$']
-        self.fit_sig = ['$\sigma t_0$', '$\sigma t_r', '$\sigma t_f$', '$\sigma Q$', '$\sigma dV$', '$\sigma V_0$']
+        self.fit_params = ['event', 'L', 'CH', 't_0', 't_r', 't_f', 'Q', 'dV', 'V_0']
+        self.fit_sig = ['sig_t_0', 'sig_t_r', 'sig_t_f', 'sig_Q', 'sig_dV', 'sig_V_0']
+        self.fit_params2 = ['L [cm]', 'CH', '$t_0$', '$t_r$', '$t_f$', '$Q$', '$dV$', '$V_0$']
+        self.fit_sig2 = ['$\sigma t_0$', '$\sigma t_r', '$\sigma t_f$', '$\sigma Q$', '$\sigma dV$', '$\sigma V_0$']
 
     def decode_filename(self, filename: str) -> float|bool:
         try:
@@ -53,34 +55,36 @@ class Analysis():
         return waveforms
 
     def multi_loader(self, filename_decoder: Callable[str, float|bool], fit_func: Callable[Any, float]) -> pd.DataFrame|None:
-        with click.progressbar(self.files, label='Loading pos. files') as bar:
-            p_list = [ [] for i in range(len(self.fit_params)) ]
-            q_list = [ [] for i in range(len(self.fit_params)) ]
-            for filename in bar:
-                source_position = filename_decoder(filename.name)
-                if not source_position:
-                    print(f"cant decode {filename=}. Skip")
-                    continue
-                #waveforms = self.load_waveform(filename)
-                waveforms = DigitizerEventData.create_from_file(filename)
-                with click.progressbar(range(len(waveforms[0][:100])),label=f'Analyzing waveforms ({source_position}cm)') as wbar:
-                    for nevt in wbar:
-                        for channel in range(self.channels):
-                            p_list[0].append(source_position)
-                            p_list[1].append(channel)
-                            p,q = self.get_waveform_fit(fit_func, waveforms[channel][nevt].waveform) 
-                            for i in range(len(p)):
-                                p_list[i+2].append(p[i])
-                                q_list[i].append(np.sqrt(np.diag(q))[i])
-                            
-                            #sns.lineplot(x=self.t, y=waveforms[0][nevt].waveform, label='CH0')
-                            #sns.lineplot(x=self.t, y=waveforms[1][nevt].waveform, label='CH1')
-                            #sns.lineplot(x=self.t, y=fit_func(self.t,*p0))
-                            #sns.lineplot(x=self.t, y=fit_func(self.t,*p1))
-                            #plt.show()
-            params_dict = dict(zip(self.fit_params+self.fit_sig, p_list+q_list))
-            #return params_dict
-            return params_dict
+        evt_counter = 0
+        p_list = [ [] for i in range(len(self.fit_params)) ]
+        q_list = [ [] for i in range(len(self.fit_params)) ]
+        for nfile, filename in enumerate(self.files):
+            source_position = filename_decoder(filename.name)
+            if not source_position:
+                print(f"cant decode {filename=}. Skip")
+                continue
+            #waveforms = self.load_waveform(filename)
+            waveforms = DigitizerEventData.create_from_file(filename)
+            with click.progressbar(range(len(waveforms[0])),label=f'Analyzing waveforms {nfile}/{len(self.files)} ({source_position}cm)') as wbar:
+                for nevt in wbar:
+                    evt_counter += 1
+                    for channel in range(self.channels):
+                        p_list[0].append(evt_counter)
+                        p_list[1].append(source_position)
+                        p_list[2].append(channel)
+                        p,q = self.get_waveform_fit(fit_func, waveforms[channel][nevt].waveform) 
+                        for i in range(len(p)):
+                            p_list[i+3].append(p[i])
+                            q_list[i].append(np.sqrt(np.diag(q))[i])
+                        
+                        #sns.lineplot(x=self.t, y=waveforms[0][nevt].waveform, label='CH0')
+                        #sns.lineplot(x=self.t, y=waveforms[1][nevt].waveform, label='CH1')
+                        #sns.lineplot(x=self.t, y=fit_func(self.t,*p0))
+                        #sns.lineplot(x=self.t, y=fit_func(self.t,*p1))
+                        #plt.show()
+        params_dict = dict(zip(self.fit_params+self.fit_sig, p_list+q_list))
+        #return params_dict
+        return params_dict
 
     def get_waveform_fit(self, fit_func: Callable[Any, float], waveform: np.ndarray):
         get_t0 = lambda t_m, t_r, t_f: t_m - t_r * t_f / (t_f - t_r) * np.log(t_f/t_r)
@@ -113,7 +117,7 @@ def sig_fit(t, t0, t_r, t_f, Q, dV, V0=0):
 def get_wf_params(root_filename):
     events = DigitizerEventData.create_from_file(root_filename)
     waveforms_channel = [[event.waveform for event in events[0]], [event.waveform for event in events[1]]]
-    with click.progressbar(range(len(waveforms_channel[0][:1000]))) as bar:
+    with click.progressbar(range(len(waveforms_channel[0]))) as bar:
         p_tab = [[],[]]
         p_cov = [[],[]]
         for nwf in bar:
