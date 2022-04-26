@@ -1,0 +1,13 @@
+# Python build
+*venv*
+*.pyc
+*build*
+*dist*
+*eggs*
+*pycache*
+
+# Data, outputs
+*data/
+*.csv
+*.pdf
+*.png
