@@ -1,11 +1,9 @@
 import os
-import  matplotlib
 import linecache
 import pandas as pd
-import  matplotlib.pyplot as plt
+
 from DRSpy.main import click
 
-matplotlib.use("Agg")
 
 def log(msg, color="white", wait=False):
     if wait:    print(click.style(msg, fg=color), end="")

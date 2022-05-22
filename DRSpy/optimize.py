@@ -1,6 +1,18 @@
-from scipy import curve_fit
+from DRSpy.analysis import np
 
-# Fits
+####### Func
+
+def w_avg(x, w):
+    """
+    Weighted Average
+    """
+    x, w = np.array(x), np.array(w)
+    return  (x*w).sum()/w.sum()
+
+def quenching(x, a, c, *args):
+    pass
+
+####### Fit
 
 def landau_fit():
     pass
@@ -9,9 +21,6 @@ def moyal_fit():
 
 def linear_fit(x, a, b):
     return a*x+b
-
-def quenching(x, a, c, *args):
-    pass
 
 def gauss():
     pass
