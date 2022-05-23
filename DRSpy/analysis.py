@@ -110,26 +110,27 @@ class Analysis():
         vis.save(figg, "ln.png")
         figg, axx = vis.create_figure()
         for i, j in enumerate(asym.keys()):
-            vis.add_plot(axx, asym[j][0], asym[j][4], xlabel="Distance [cm]", ylabel="Channel [V]", legend=True, grid=True, fmt="o", label=f"{j}", alpha=0.8)
-            vis.add_plot(axx, asym[j][0], asym[j][5], xlabel="Distance [cm]", ylabel="Channel [V]", legend=True, grid=True, fmt="o", label=f"{j}", alpha=0.8)
+            vis.add_plot(axx, asym[j][0], asym[j][4], xlabel="Distance [cm]", ylabel="Channel [V]", legend=True, grid=True, fmt="o", label=f"CH0 - {j}", alpha=0.8)
+            vis.add_plot(axx, asym[j][0], asym[j][5], xlabel="Distance [cm]", ylabel="Channel [V]", legend=True, grid=True, fmt="o", label=f"CH1 - {j}", alpha=0.8)
         vis.save(figg, "c1c2.png")
 
-        land = {}
-        land["C"] = np.array(landaupeaks["C"]).T
-        land["D"] = np.array(landaupeaks["D"]).T
-        land["U"] = np.array(landaupeaks["U"]).T
-        figgg, axxx = vis.create_figure()
-        vis.add_plot(axxx, land["C"][0], land["C"][1],yerr=land["C"][3], xlabel="Distance [cm]", ylabel="Landau Channel [V]", legend=True, grid=True, fmt="o", label=f"CH0", alpha=0.8)
-        vis.add_plot(axxx, land["C"][0], land["C"][2],yerr=land["C"][3], xlabel="Distance [cm]", ylabel="Landau Channel [V]", legend=True, grid=True, fmt="o", label=f"CH1", alpha=0.8)
-        vis.save(figgg, "landau-C.png")
-        figgg, axxx = vis.create_figure()
-        vis.add_plot(axxx, land["D"][0], land["D"][1],yerr=land["D"][3], xlabel="Distance [cm]", ylabel="Landau Channel [V]", legend=True, grid=True, fmt="o", label=f"CH0", alpha=0.8)
-        vis.add_plot(axxx, land["D"][0], land["D"][2],yerr=land["D"][3], xlabel="Distance [cm]", ylabel="Landau Channel [V]", legend=True, grid=True, fmt="o", label=f"CH1", alpha=0.8)
-        vis.save(figgg, "landau-D.png")
-        figgg, axxx = vis.create_figure()
-        vis.add_plot(axxx, land["U"][0], land["U"][1],yerr=land["U"][3], xlabel="Distance [cm]", ylabel="Landau Channel [V]", legend=True, grid=True, fmt="o", label=f"CH0", alpha=0.8)
-        vis.add_plot(axxx, land["U"][0], land["U"][2],yerr=land["U"][3], xlabel="Distance [cm]", ylabel="Landau Channel [V]", legend=True, grid=True, fmt="o", label=f"CH1", alpha=0.8)
-        vis.save(figgg, "landau-U.png")
+        if fit:
+            land = {}
+            land["C"] = np.array(landaupeaks["C"]).T
+            land["D"] = np.array(landaupeaks["D"]).T
+            land["U"] = np.array(landaupeaks["U"]).T
+            figgg, axxx = vis.create_figure()
+            vis.add_plot(axxx, land["C"][0], land["C"][1],yerr=land["C"][3], xlabel="Distance [cm]", ylabel="Landau Channel [V]", legend=True, grid=True, fmt="o", label=f"CH0", alpha=0.8)
+            vis.add_plot(axxx, land["C"][0], land["C"][2],yerr=land["C"][3], xlabel="Distance [cm]", ylabel="Landau Channel [V]", legend=True, grid=True, fmt="o", label=f"CH1", alpha=0.8)
+            vis.save(figgg, "landau-C.png")
+            figgg, axxx = vis.create_figure()
+            vis.add_plot(axxx, land["D"][0], land["D"][1],yerr=land["D"][3], xlabel="Distance [cm]", ylabel="Landau Channel [V]", legend=True, grid=True, fmt="o", label=f"CH0", alpha=0.8)
+            vis.add_plot(axxx, land["D"][0], land["D"][2],yerr=land["D"][3], xlabel="Distance [cm]", ylabel="Landau Channel [V]", legend=True, grid=True, fmt="o", label=f"CH1", alpha=0.8)
+            vis.save(figgg, "landau-D.png")
+            figgg, axxx = vis.create_figure()
+            vis.add_plot(axxx, land["U"][0], land["U"][1],yerr=land["U"][3], xlabel="Distance [cm]", ylabel="Landau Channel [V]", legend=True, grid=True, fmt="o", label=f"CH0", alpha=0.8)
+            vis.add_plot(axxx, land["U"][0], land["U"][2],yerr=land["U"][3], xlabel="Distance [cm]", ylabel="Landau Channel [V]", legend=True, grid=True, fmt="o", label=f"CH1", alpha=0.8)
+            vis.save(figgg, "landau-U.png")
                     
     def det_delay_spectra(self,dist, filename="delay.png"):    
         fig, ax = vis.create_figure()
@@ -146,13 +147,25 @@ class Analysis():
         vis.save(fig, f"{dist[0]}-{dist[-1]}_{filename}")
     
     def get_assymetry(self, p2p):
-        print(p2p.shape)
-        ch0_max = p2p[1].max()
-        ch1_max = p2p[2].max()
-        nc1 = p2p[1].tolist().index(ch0_max)
-        nc2 = p2p[2].tolist().index(ch1_max)
-        c1 = p2p[0][nc1]
-        c2 = p2p[0][nc2]
+        #ch0_max = p2p[1].max()
+        #ch1_max = p2p[2].max()
+        #nc1 = p2p[1].tolist().index(ch0_max)
+        #nc2 = p2p[2].tolist().index(ch1_max)
+        #c1 = p2p[0][nc1]
+        #c2 = p2p[0][nc2]
+        c1 = optim.w_avg(p2p[0],p2p[1])
+        c2 = optim.w_avg(p2p[0],p2p[2])
         return optim.assymetry(c1, c2), optim.chspec(c1, c2), optim.chspec_ln(c1, c2), (c1,c2)
+
+    def get_teo(self,filename="teo.png", A=1, mu=1):
+        fig, ax = vis.create_figure()
+        x = np.linspace(-5,5,1000)
+        c1 = optim.decay_law(x, A, mu)
+        c2 = optim.decay_law(x, A, mu)[::-1]
+        vis.add_plot(ax,x, c1, label="$c_1 = Ae^{-\\mu x}$",fmt="--")
+        vis.add_plot(ax,x, c2, label="$c_2 = Ae^{-\\mu x}$", fmt="--")
+        vis.add_plot(ax,x, optim.chspec(c1,c2), label="$\\sqrt{c_1 c_2}$",fmt="--")
+        vis.add_plot(ax,x, optim.chspec_ln(c1,c2), label="$ln\\frac{c_1}{c_2}$", fmt="--", legend=True, ylim=(-5,40), xlabel="Distance")
+        vis.save(fig,filename)
 
 
