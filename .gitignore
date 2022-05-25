@@ -4,10 +4,12 @@
 *build*
 *dist*
 *eggs*
+*egg-info*
 *pycache*
 
 # Data, outputs
 *data/
+*_bck
 *.csv
 *.pdf
 *.png
