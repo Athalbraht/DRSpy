@@ -55,10 +55,12 @@ class Analysis():
                         wavg[0].append(distance)
                         wavg[1].append(_wa)
             data[edge] = wavg
-            vis.add_plot(ax, wavg[0], wavg[1], xlabel="Distance [cm]", ylabel="Counts", title="Delay Weighted Mean", legend=True, grid=True, fmt="o", label=edge)
+            vis.add_plot(ax, wavg[0], wavg[1], xlabel="Distance [cm]", ylabel="Delay [ns]", title="Delay Weighted Mean", legend=True, grid=True, fmt="o", label=edge)
         if fit and "C" in data.keys():
-            xfit, yfit, params = optim.fit(optim.linear, data["C"][0], data["C"][1])
-            vis.add_plot(ax, xfit, yfit, xlabel="Distance [cm]", ylabel="Counts", title="Delay Weighted Mean", legend=True, grid=True, fmt="--", label=f"fit: ax+b")
+            xfit, yfit, params, pcovv = optim.fit(optim.linear, data["C"][0], data["C"][1])
+            vis.add_plot(ax, xfit, yfit, xlabel="Distance [cm]", ylabel="Delay [ns]", title="Delay Weighted Mean", legend=True, grid=True, fmt="--", label=f"fit: ax+b")
+            log("--> Fit ax+b: ", wait=True); log(f"a = {params[0]} +- {pcovv[0,0]**0.5}, b = {params[1]} +- {pcovv[1,1]**0.5}","green")
+            log(f"--> Speed of light in scintillator: ", wait=True); log(f"c = {-2/params[0]}", "green")
         vis.save(fig, filename)
 
     ### TO FIX !!!    
@@ -80,8 +82,8 @@ class Analysis():
                             vis.add_plot(ax, p2p[0], p2p[1], xlabel="Channel [V]", ylabel="Counts", title=f"Peak to Peak. Distance: {distance}cm", legend=True, grid=True, fmt="-", label=f"CH0-{edge}", alpha=0.8)
                             vis.add_plot(ax, p2p[0], p2p[2], xlabel="Channel [V]", ylabel="Counts", title=f"Peak to Peak. Distance: {distance}cm", legend=True, grid=True, fmt="-", label=f"CH1-{edge}", alpha=0.8)
                             if fit:
-                                x0_fit, y0_fit, params0 = optim.fit(optim.landau, p2p[0], p2p[1])
-                                x1_fit, y1_fit, params1 = optim.fit(optim.landau, p2p[0], p2p[2])
+                                x0_fit, y0_fit, params0, pcov0 = optim.fit(optim.landau, p2p[0], p2p[1])
+                                x1_fit, y1_fit, params1, pcov1 = optim.fit(optim.landau, p2p[0], p2p[2])
                                 landaupeaks[edge].append([distance, params0[0],params1[0],params0[1], params1[1]])
                                 vis.add_plot(ax, x0_fit, y0_fit, xlabel="Channel [V]", ylabel="Counts", title=f"Peak to Peak. Distance: {distance}cm", legend=True, grid=True, fmt="--", label=None, alpha=0.8)
                                 vis.add_plot(ax, x1_fit, y1_fit, xlabel="Channel [V]", ylabel="Counts", title=f"Peak to Peak. Distance: {distance}cm", legend=True, grid=True, fmt="--", label=None, alpha=0.8)
@@ -107,6 +109,10 @@ class Analysis():
         figg, axx = vis.create_figure()
         for i, j in enumerate(asym.keys()):
             vis.add_plot(axx, asym[j][0], asym[j][3], xlabel="Distance [cm]", ylabel=pp[2], legend=True, grid=True, fmt="o", label=f"{j}", alpha=0.8)
+        
+        lxfit, lyfit, lparams, lpcovv = optim.fit(optim.linear, asym["C"][0], asym["C"][3])
+        vis.add_plot(axx, lxfit, lyfit, xlabel="Distance [cm]", ylabel=pp[2], legend=True, grid=True, fmt="--", label=f"fit", alpha=0.8)
+        log(f"---> FIT ln(c1/c2): a = {lparams[0]} +- {lpcovv[0,0]**0.5}, b = {lparams[1]} +- {lpcovv[1,1]**0.5}" ,"green")
         vis.save(figg, "ln.png")
         figg, axx = vis.create_figure()
         for i, j in enumerate(asym.keys()):

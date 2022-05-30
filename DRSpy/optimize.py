@@ -22,17 +22,17 @@ def chspec_ln(c1,c2):
 
 ####### Fit
 
-def fit(func, X, Y, n=1000, xlim=False):
+def fit(func, X, Y, n=1000, xlim=False, maxfev=6500):
     """ Fit engine """
     X, Y = np.array(X, dtype=float), np.array(Y, dtype=float) 
     if xlim: 
         xmin, xmax = xlim[0], xlim[1]
     else: 
         xmin, xmax = X.min(), X.max()
-    params, _ = curve_fit(func, X, Y, maxfev=6500)
+    params, pcov = curve_fit(func, X, Y, maxfev=maxfev)
     X_fit = np.linspace(xmin, xmax, n)
     Y_fit = func(X_fit, *params)
-    return X_fit, Y_fit, params
+    return (X_fit, Y_fit, params, pcov)
 
 def linear(x, a, b):
     """ Linear function """
