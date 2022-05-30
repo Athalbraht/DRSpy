@@ -1,10 +1,7 @@
 import xml.etree.ElementTree as ET
-import json, csv
+import json
 import pandas as pd
 from os import sep
-import argparse
-from os import path, listdir, sep
-from time import time
 
 
 class DataExtractor(object):
