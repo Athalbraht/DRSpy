@@ -1,3 +1,5 @@
+###############################################################
+###############################################################
 import os
 import click
 import DRSpy
@@ -6,23 +8,28 @@ from DRSpy.data_struct import *
 from scipy.optimize import curve_fit
 import numpy as np
 
+###############################################################
+
 def print_version(ctx, param, value):
+    """ Print DRSpy Verison """
     if not value or ctx.resilient_parsing:
         return
     print(f"DRSpy v{DRSpy.__version__}")
     ctx.exit()
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
+###############################################################
+
 @click.group(invoke_without_command=True, context_settings=CONTEXT_SETTINGS)
-@click.option('-d','--db', 'fdb', help='Database location', type=str, default="data.csv", show_default=True)
-@click.option('-c','--config', 'fconfig', help='Configuration file', type=str, default="drspy.config", show_default=True)
+@click.option('-d','--db', 'fdb', help='Path to spectra database', type=str, default="drs_spectra.csv", show_default=True)
+@click.option('-x','--dbxml', 'fdbxml', help='Path to waveforms database', type=str, default="drs_waveforms.csv", show_default=True)
+@click.option('-m','--meta', 'fmeta', help='Path to metadata file', type=str, default="drs_info.ini", show_default=True)
 @click.option('-v', '--verbose', 'fverbose', help='Enable verbosity mode', is_flag=True, default=False)
-@click.option('--version', is_flag=True, callback=print_version, expose_value=False, is_eager=True)
+@click.option('--version', help="Show DRSpy version", is_flag=True, callback=print_version, expose_value=False, is_eager=True)
 @click.pass_context
-def main(ctx, fdb, fverbose, fconfig):
+def main(ctx, fdb, fdbxml, fmeta, fverbose):
     """
         Data analysis tool for DRS4(PSI) board.
-        
     """
     ctx.obj = DataStruct(fverbose=fverbose, config_file=fconfig, drsframe=fdb)
     """
@@ -32,22 +39,28 @@ def main(ctx, fdb, fverbose, fconfig):
     ctx.info_name = "gencfg"
     print(main.get_command(ctx, "gencfg").get_help(ctx))
     """
-@main.command(short_help="Update database")
+@main.command(short_help="Load new files")
+@click.option('-a','--auto', 'fauto', help='Recognize file automatically in specified folder', is_flag=True, default=False)
 @click.option('-f','--format', 'fformat', help='Input file format', type=click.Choice(["xml","PtP", "delay"]), default="PtP", show_default=True)
-@click.option('-a','--auto', 'fauto', help='Recognize file automatically', is_flag=True, default=False)
 @click.option('-t','--tag', 'ftag', help='Add <tag> to data headers', default="", type=str)
 @click.argument("files", nargs=-1, metavar="<files or dir>")
 @click.pass_context
 def update(ctx, files, fformat, fauto, ftag):
+    """
+        Load new data files.
+    """
     if fauto:
         ctx.obj.auto_recognize(files[0], ftag)
     else:
         for file in files:
             ctx.obj.load_file(file, fformat, ftag)
 
-@main.command(short_help="Data description")
+@main.command(short_help="DataBase description")
 @click.pass_context
-def desc(ctx):
+def describe(ctx):
+    """ 
+        Print information saved in metadata file.
+    """
     log(ctx.obj.data.describe(), "green")
 
 @main.command(short_help="Command line")
