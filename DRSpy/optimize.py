@@ -53,3 +53,7 @@ def poly2(x, a, b, c):
 def poly3(x, a, b, c, d):
     """ Polynominal n3 """
     return d + c*x + b*x**2 + a*x**3
+
+def inspector_calib(x, a):
+    """ Calibration function for InSpector-1000. f(x) = ax """
+    return a*x
