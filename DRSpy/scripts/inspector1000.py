@@ -38,14 +38,17 @@ class InSpector():
             log("--> Calculated a param: ", wait=True); log(f"a = {round(p[0],3)} ± {round(pc[0,0], 3)} ", "green")
             self.calibration = p[0]
     
-    def get_spectrum(self, paths):
+    def get_spectrum(self, paths, normalize=False):
         """ """
+        _ylabel = "Counts"
+        if normalize: _ylabel += " [MinMax Norm]"
         if self.calibration == 1:
             log("---> Missing calibration", "yellow")
             _xlabel = "Channel"
+            self.calib_scaler = self.calibration
         else:
             _xlabel = "Energy [MeV]"
-            self.calibration *= 1e-3
+            self.calib_scaler = self.calibration * 1e-3
             
         try:
             filenames = [ os.path.basename(i).split(".")[0] for i in paths ]
@@ -56,14 +59,26 @@ class InSpector():
                 with open(file, "r") as ff:
                     _dat = [float(i) for i in ff.readlines()][2::] #unidentified 2 rows
                     Y = np.array(_dat)
-                    X = np.arange(0, len(Y))*self.calibration
-                    add_plot(ax, X, Y, filenames[n], legend=True,fmt="-", xlabel=_xlabel, ylabel="Counts", grid=True)
+                    if normalize:
+                        Y = self.normalize(Y)
+                    X = np.arange(0, len(Y))*self.calib_scaler
+                    add_plot(ax, X, Y, filenames[n], legend=True,fmt="-", xlabel=_xlabel, ylabel=_ylabel, grid=True)
             save(fig, f"InSpect.{self.plot_ext}")
         
         except Exception as e:
             log("---> Failed to draw spectra", "red")
             log(f"\n{e}")
-        
+
+    def normalize(self, data, method="minmax"):
+        """ """
+        data = np.array(data)
+        normalized_data = np.zeros_like(data)
+        for n,nw in enumerate(data):
+            if method == "minmax":
+                normalized_data[n] = (nw-data.min())/(data.max()-data.min())
+        return normalized_data
+            
+       
 
 if __name__  == "__main__":
     files = argv[1::]
