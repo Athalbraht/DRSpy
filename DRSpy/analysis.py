@@ -61,6 +61,8 @@ class Analysis():
             vis.add_plot(ax, xfit, yfit, xlabel="Distance [cm]", ylabel="Delay [ns]", title="Delay Weighted Mean", legend=True, grid=True, fmt="--", label=f"fit: ax+b")
             log("--> Fit ax+b: ", wait=True); log(f"a = {params[0]} +- {pcovv[0,0]**0.5}, b = {params[1]} +- {pcovv[1,1]**0.5}","green")
             log(f"--> Speed of light in scintillator: ", wait=True); log(f"c = {-2/params[0]}", "green")
+            # source position fix fit
+            
         vis.save(fig, filename)
 
     ### TO FIX !!!    

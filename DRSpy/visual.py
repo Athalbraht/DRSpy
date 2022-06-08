@@ -1,6 +1,58 @@
 from DRSpy.analysis import np, plt
 from DRSpy.analysis import matplotlib
 
+from abc import ABC, abstractmethod
+
+class Figure(ABC):
+    """
+    The one to rule then all. Basic representation of Figure classes.
+
+    :param row: Number of rows in figure, defaults to 1
+    :type row: 1, optional
+    :param col: Number of columns in figure, defaults to 1
+    :type col: 1, optional
+    :param figsize: Figure size, defaults to (12,7)
+    :type figsize: (int, int), optional
+    """
+
+    def __init__(self, row=1, col=1, figsize=(12,3)): 
+        """
+        Creating figure and axis object (matplotlib)
+        """
+        self.fig, self.ax = plt.subplots(row, col, figsize=figsize)
+        self.
+
+
+    def savefig(self, filename, fig_extension="png"):
+        """
+        Save figure to file and clear axis.
+
+        :param filename: Filename of saved figure
+        :type filename: str        
+        :param fig_extension: File extension  of saved figure, defaults to ".png"
+        :type fig_extension: str, optional
+        """
+        self.fig.savefig(f"{filename}.{fig_extension}")
+        plt.close()
+
+    @abstractmethod
+    def add_plot(self, axis, **kwargs):
+        """
+        Add new plot to figure.
+
+        :param axis: Axis to draw plot.
+        :type: numpy.ndarray
+        :param kwargs: Configuration parameters specific for child classes.
+        """
+        pass
+        
+
+class Regular(Figure):
+    """
+    Create regular
+    """
+    
+
 def create_figure(figsize=(12,7),row=1, col=1):
     plt.cla()
     plt.clf()
