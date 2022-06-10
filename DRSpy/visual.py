@@ -20,7 +20,7 @@ class Figure(ABC):
         Creating figure and axis object (matplotlib)
         """
         self.fig, self.ax = plt.subplots(row, col, figsize=figsize)
-        self.
+        #self.
 
 
     def savefig(self, filename, fig_extension="png"):
@@ -51,6 +51,8 @@ class Regular(Figure):
     """
     Create regular
     """
+    def __init__(self):
+        pass
     
 
 def create_figure(figsize=(12,7),row=1, col=1):

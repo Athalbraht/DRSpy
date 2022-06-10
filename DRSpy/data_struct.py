@@ -26,11 +26,19 @@ class DataStruct():
                         "Delay"     : [3, 154]}
     @property
     def data(self):
+        """
+        :return: return database
+        :rtype: pandas.DataFrame
+        """
         return self._data
 
     @data.setter
     def data(self, new_data):
         """
+        Extend the database with new data and update csv file
+        
+        :param new_data: new dataframe
+        :type new_data: pandas.DataFrame
         """
         try:
             if self.fverbose: log("---> Creating backup file", "yellow")
@@ -40,10 +48,11 @@ class DataStruct():
             if self.fverbose: log("---> Saving new csv file", "yellow")
             self._data.to_csv(f"{self.data_file}", index=False)
         except Exception as e:
-            log(f"---> Failed to update dataframe:\n{e}")
+            log(f"---> Failed to update dataframe. Backup file saved as {self.data_file}_bck:\n\n{e}", color="red")
     
     def check_csv(self):
         """ 
+        Check for existance of database or create new one.
         """
         self.nP2P = 0
         self.nDelay = 0
@@ -61,6 +70,13 @@ class DataStruct():
 
     def read_txt(self, filename, ftype):
         """ 
+        Read txt file and append to database. 
+        !TMP: data rows ranges hardcoded in self.cuts!
+
+        :param filename: full path to data file
+        :type filename: str
+        :param ftype: type of file "P2P" or "Delay"
+        :type ftype: str
         """
         try:
             meta = self.name_decode(filename.split("/")[-1].split(".")[0])
@@ -88,6 +104,10 @@ class DataStruct():
 
     def auto_decode(self, path):
         """
+        Recognize file types automatically in directory and redirect to self.read_txt() or self.read_xml()        
+
+        :param path: Path to folder with data files
+        :type path: str
         """
         try:
             log("---> Trying to decode files.", wait=True)
@@ -127,6 +147,13 @@ class DataStruct():
 
     def name_decode(self, name, style="std"):
         """ 
+        Extract metainfo from filename e.g. 40_U_t to dict{"Distance":40, "Position":"U", "Delay":True}
+        
+        :param name: filename to decode
+        :type name: str
+        :param style: filename format, default to "std"
+        :return: decoded metainfo
+        :rtype: dict{"Distance":float, "Position":str, "Delay":bool}
         """
         decoder = {}
         try:
