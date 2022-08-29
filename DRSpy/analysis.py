@@ -68,8 +68,8 @@ class Analysis():
     ### TO FIX !!!    
     def get_p2p_spectra(self, dist, filename="P2P.png", fit=False):
         """ """
-        landaupeaks = {"C":[], "D":[], "U":[]}
-        asym_data = {"C":[], "D":[], "U":[]}
+        landaupeaks = {"C":[], "D":[], "U":[], "PPA":[]}
+        asym_data = {"C":[], "D":[], "U":[], 'PPA':[]}
         with click.progressbar(self.distances, label=f"---> Calculating P2P specturm ") as distances:
             for distance in distances: 
                 if distance >= dist[0] and distance <= dist[-1]:
@@ -96,9 +96,7 @@ class Analysis():
                             ####
                     vis.save(fig, f"{distance}_{filename}")
         asym = {}
-        asym["C"] = np.array(asym_data["C"]).T
-        asym["D"] = np.array(asym_data["D"]).T
-        asym["U"] = np.array(asym_data["U"]).T
+        asym["PPA"] = np.array(asym_data["PPA"]).T
         pp = ["$\\frac{c_1-c_2}{c_1+c_2}$", "$\\sqrt{c_1c_2}$", "$ln\\frac{c_1}{c_2}$"]
         figg, axx = vis.create_figure()
         for i, j in enumerate(asym.keys()):
@@ -112,9 +110,9 @@ class Analysis():
         for i, j in enumerate(asym.keys()):
             vis.add_plot(axx, asym[j][0], asym[j][3], xlabel="Distance [cm]", ylabel=pp[2], legend=True, grid=True, fmt="o", label=f"{j}", alpha=0.8)
         
-        lxfit, lyfit, lparams, lpcovv = optim.fit(optim.linear, asym["C"][0], asym["C"][3])
+        lxfit, lyfit, lparams, lpcovv = optim.fit(optim.linear, asym["PPA"][0], asym["PPA"][3])
         vis.add_plot(axx, lxfit, lyfit, xlabel="Distance [cm]", ylabel=pp[2], legend=True, grid=True, fmt="--", label=f"fit", alpha=0.8)
-        log(f"---> FIT ln(c1/c2): a = {lparams[0]} +- {lpcovv[0,0]**0.5}, b = {lparams[1]} +- {lpcovv[1,1]**0.5}" ,"green")
+        log(f"---> FIT ln(c1/c2): a = {lparams[0]} +- {lpcovv[0,0]**0.5}, b = {lparams[1]} +- {lpcovv[1,1]**0.5}\n lambda = {round(2/lparams[0],2)} +- {round(2/(lparams[0])**2 * lpcovv[0,0]**0.5,2)}" ,"green")
         vis.save(figg, "ln.png")
         figg, axx = vis.create_figure()
         for i, j in enumerate(asym.keys()):
