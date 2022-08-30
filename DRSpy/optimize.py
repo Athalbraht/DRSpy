@@ -20,6 +20,32 @@ def chspec(c1,c2):
 def chspec_ln(c1,c2):
     return np.log(c1/c2)
 
+def gamma_coff(x, L, p, q):
+    """
+    Gamma cofficient for time_fix() and sig_fix()
+    """
+    f1 = np.sqrt( p**2 + q**2 + (L-x)**2)
+    f2 = np.sqrt( p**2 + q**2 + (L+x)**2)
+    return f1-f2
+    
+def time_fix(x, b, c=12.2, L=43.6, p=5.6, q=3):
+    """
+    Source position fix cofficient
+    
+    :param L: float
+    :type L: float
+    :param p: float, , defaults to 
+    :type p: float,
+    :param q: float, , defaults to 
+    :type q: float,
+
+    :returns: gamma cofficient
+    :rtype: float
+    """
+    return 1/c * gamma_coff(x, L, p, q) + b
+def sig_fix(x, b, lm=117, L=43.6, p=5.6, q=3):
+    return 2/lm * gamma_coff(x, L, p, q) + b
+
 ####### Fit
 
 def fit(func, X, Y, n=1000, xlim=False, maxfev=6500):
@@ -53,3 +79,7 @@ def poly2(x, a, b, c):
 def poly3(x, a, b, c, d):
     """ Polynominal n3 """
     return d + c*x + b*x**2 + a*x**3
+
+def inspector_calib(x, a):
+    """ Calibration function for InSpector-1000. f(x) = ax """
+    return a*x

@@ -1,0 +1,7 @@
+name: PIP uploader
+
+on:
+  push:
+    branches: 
+      - master
+

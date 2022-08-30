@@ -31,7 +31,7 @@ def main(ctx, fdb, fdbxml, fmeta, fverbose):
     """
         Data analysis tool for DRS4(PSI) board.
     """
-    ctx.obj = DataStruct(fverbose=fverbose, config_file=fconfig, drsframe=fdb)
+    ctx.obj = DataStruct(fverbose=fverbose, data_file=fdb)
     """
     print(f"\n{ctx.get_help()}\n")
     ctx.info_name = "run"
@@ -50,7 +50,7 @@ def update(ctx, files, fformat, fauto, ftag):
         Load new data files.
     """
     if fauto:
-        ctx.obj.auto_recognize(files[0], ftag)
+        ctx.obj.auto_decode(files[0], ftag)
     else:
         for file in files:
             ctx.obj.load_file(file, fformat, ftag)
