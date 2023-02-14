@@ -219,4 +219,4 @@ if __name__ == '__main__':
     #L,T = main(argv[3])
     print('Usage: python analysis.py <data_folder>')
     run = Analysis(argv[1])
-    run.multi_loader(run.decode_filename, sig_fit)
+    params = run.multi_loader(run.decode_filename, sig_fit)

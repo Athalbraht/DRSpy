@@ -12,7 +12,7 @@ class RawDataContainer:
 
 	def __init__(self, file: str):
 
-		print('Reading File...')
+		#print('Reading File...')
 		self.file = file
 		self.file_content = self.read_file() 
 
@@ -84,7 +84,7 @@ class Preprocessor:
 	@classmethod
 	def preprocess(cls, RawDataContainer):
 		'''Classmethod to create an instance of Preprocessor and apply the preprocessing onto the RawDataContainer'''
-		print('Preprocessing...')
+		#print('Preprocessing...')
 		preprocessor = cls(RawDataContainer)
 		preprocessor.preprocess_raw_data()
 		return preprocessor.RawDataContainer
@@ -118,7 +118,7 @@ class DigitizerEventData:
 
 		'''Creates the event dictionary'''
 
-		print('Creating event dict...')
+		#print('Creating event dict...')
 		timestamps = cycle(self.data.timestamps) 
 		events_dict = {}
 
