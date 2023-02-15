@@ -54,8 +54,8 @@ class Analysis():
 
     def multi_loader(self, filename_decoder: Callable[str, float|bool], fit_func: Callable[Any, float]) -> pd.DataFrame|None:
         with click.progressbar(self.files, label='Loading pos. files') as bar:
-            p_list = [ [] for i in range(len(self.fit_params)*2+2) ]
-            q_list = [ [] for i in range(len(self.fit_params)*2) ]
+            p_list = [ [] for i in range(len(self.fit_params)) ]
+            q_list = [ [] for i in range(len(self.fit_params)) ]
             for filename in bar:
                 source_position = filename_decoder(filename.name)
                 if not source_position:
@@ -79,7 +79,8 @@ class Analysis():
                             #sns.lineplot(x=self.t, y=fit_func(self.t,*p1))
                             #plt.show()
             params_dict = dict(zip(self.fit_params+self.fit_sig, p_list+q_list))
-            return params_dict
+            #return params_dict
+            return p_list, q_list
 
     def get_waveform_fit(self, fit_func: Callable[Any, float], waveform: np.ndarray):
         get_t0 = lambda t_m, t_r, t_f: t_m - t_r * t_f / (t_f - t_r) * np.log(t_f/t_r)
