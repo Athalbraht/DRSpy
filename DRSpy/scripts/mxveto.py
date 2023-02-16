@@ -80,7 +80,7 @@ class Analysis():
                             #plt.show()
             params_dict = dict(zip(self.fit_params+self.fit_sig, p_list+q_list))
             #return params_dict
-            return p_list, q_list
+            return params_dict
 
     def get_waveform_fit(self, fit_func: Callable[Any, float], waveform: np.ndarray):
         get_t0 = lambda t_m, t_r, t_f: t_m - t_r * t_f / (t_f - t_r) * np.log(t_f/t_r)
