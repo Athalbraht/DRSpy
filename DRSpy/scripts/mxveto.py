@@ -18,13 +18,15 @@ from typing import *
 sns.set_theme()
 
 class Analysis():
-    def __init__(self, data_path: Path):
+    def __init__(self, data_path: Path, limit_file: Path|None=None):
         self.data_path = Path(data_path)
         self.files = []
         for file in self.data_path.iterdir():
             if file.suffix == '.root':
                 self.files.append(self.data_path.joinpath(file))
         evt = DigitizerEventData.create_from_file(self.files[0])
+        if limit_file:
+            self.read_limit = len(DigitizerEventData.create_from_file(limit_file)[0])
         self.T_samples = len(evt[0][0].waveform)
         self.t = 0.2 * np.arange(0, self.T_samples)
 
@@ -67,6 +69,9 @@ class Analysis():
             waveforms = DigitizerEventData.create_from_file(filename)
             with click.progressbar(range(len(waveforms[0])),label=f'Analyzing waveforms {nfile}/{len(self.files)} ({source_position}cm)') as wbar:
                 for nevt in wbar:
+                    if nevt > self.read_limit:
+                        print(f'File to big. SKIP')
+                        break
                     evt_counter += 1
                     for channel in range(self.channels):
                         p_list[0].append(evt_counter)
