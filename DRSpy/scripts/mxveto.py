@@ -62,7 +62,7 @@ class Analysis():
         q_list = [ [] for i in range(len(self.fit_params)) ]
         for nfile, filename in enumerate(self.files):
             source_position = filename_decoder(filename.name)
-            if not source_position:
+            if not isinstance(source_position, float):
                 print(f"cant decode {filename=}. Skip")
                 continue
             #waveforms = self.load_waveform(filename)
@@ -88,8 +88,50 @@ class Analysis():
                         #sns.lineplot(x=self.t, y=fit_func(self.t,*p1))
                         #plt.show()
         params_dict = dict(zip(self.fit_params+self.fit_sig, p_list+q_list))
-        #return params_dict
         return params_dict
+
+    def to_pandas(self, params_dict: Dict|str) -> Tuple[pd.DataFrame]:
+        print('-> Creating DataFrame')
+        if isinstance(params_dict, str):
+            df = pd.read_csv(params_dict)
+        else:
+            df = pd.DataFrame(params_dict)
+        dcol = ['event','t_0', 'L', 'Q']
+        print('-> Clearing nan and inf values')
+        df.replace([np.inf,-np.inf], np.nan, inplace=True)
+        df = df.dropna()
+        df = df.reset_index()
+        del df['index']
+        
+        print('-> Calculating rel error')
+        tmp = [[] for i in range(len(self.fit_sig)-1)]
+        with click.progressbar(range(len(df))) as bar:
+            for i in bar:
+                for j in range(len(tmp)):
+                    diff = round(df.loc[i,df.columns[len(self.fit_params)+1+j]]/df.loc[i,df.columns[(len(self.fit_params)-len(self.fit_sig)+1)+j]],4)
+                    if np.abs(diff) > 1 or diff == np.nan or np.abs(diff) == np.inf:
+                        tmp[j].append(1)
+                    else:
+                        tmp[j].append(diff)
+        tmp = dict(zip('rel_'+df.columns[(len(self.fit_params)-len(self.fit_sig)+1):(len(self.fit_params)+1)], tmp))
+        for i in tmp.keys():
+            df[i] = tmp[i]
+
+        print('-> Filltering data...')
+        df = df[(df['t_r'] > 0) & (df['t_f'] > 0) & (df['t_r'] < 10) & (df['t_f'] < 10) & (df['t_0'] >20) & (df['t_0'] < 80) & (df['Q'] <= 0) & (df['Q'] > -5)]
+
+        print('-> Calculating asymeties')
+        df_0 = df[df['CH']==0][dcol]
+        df_1 = df[df['CH']==1][dcol]
+        ddf = df_0.merge(df_1, how='inner', on=['event', 'L'], suffixes=['_ch0','_ch1'])
+        ddf['dt'] = ddf.apply(lambda x: x.t_0_ch1-x.t_0_ch0, axis=1)
+        ddf['ln'] = ddf.apply(lambda x: np.log(x.Q_ch1/x.Q_ch0), axis=1)
+        ddf['sqrt(c1c2)'] = ddf.apply(lambda x: np.sqrt(x.Q_ch1*x.Q_ch0), axis=1)
+        ddf['asym'] = ddf.apply(lambda x: (x.Q_ch0-x.Q_ch1)/(x.Q_ch0+x.Q_ch1), axis=1)
+        print('-> Filltering data...')
+        ddf = ddf[(np.abs(ddf['asym'])<0) & (np.abs(ddf['ln']))<1 ]
+        return df, ddf
+
 
     def get_waveform_fit(self, fit_func: Callable[Any, float], waveform: np.ndarray):
         get_t0 = lambda t_m, t_r, t_f: t_m - t_r * t_f / (t_f - t_r) * np.log(t_f/t_r)
