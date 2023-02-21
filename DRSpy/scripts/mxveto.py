@@ -27,6 +27,8 @@ class Analysis():
         evt = DigitizerEventData.create_from_file(self.files[0])
         if limit_file:
             self.read_limit = len(DigitizerEventData.create_from_file(limit_file)[0])
+        else:
+            self.read_limit = 0
         self.T_samples = len(evt[0][0].waveform)
         self.t = 0.2 * np.arange(0, self.T_samples)
 
@@ -34,7 +36,7 @@ class Analysis():
         self.df = pd.DataFrame()
         print(f'\nFound {len(self.files)} .root files. {self.T_samples=}, {self.channels=} \n')
 
-        self.fit_params = ['event', 'L', 'CH', 't_0', 't_r', 't_f', 'Q', 'dV', 'V_0']
+        self.fit_params = ['event', 'timestamp' , 'L', 'CH', 'A', 'V_r', 'V_f', 't_0', 't_r', 't_f', 'Q', 'dV', 'V_0']
         self.fit_sig = ['sig_t_0', 'sig_t_r', 'sig_t_f', 'sig_Q', 'sig_dV', 'sig_V_0']
         self.fit_params2 = ['L [cm]', 'CH', '$t_0$', '$t_r$', '$t_f$', '$Q$', '$dV$', '$V_0$']
         self.fit_sig2 = ['$\sigma t_0$', '$\sigma t_r', '$\sigma t_f$', '$\sigma Q$', '$\sigma dV$', '$\sigma V_0$']
@@ -46,7 +48,6 @@ class Analysis():
         except: 
             return False
 
-
     def load_waveform(self, root_filename: Path) -> List[Any]:
         events = DigitizerEventData.create_from_file(root_filename)
         waveforms = [] #waveform[channel] = [waveforms list, amplitudes list]
@@ -56,7 +57,7 @@ class Analysis():
             waveforms[channel].append([event.amplitude for event in events[channel]])
         return waveforms
 
-    def multi_loader(self, filename_decoder: Callable[str, float|bool], fit_func: Callable[Any, float]) -> pd.DataFrame|None:
+    def multi_loader(self, filename_decoder: Callable[str, float|bool], fit_func: Callable[Any, float], wf_num:int=-1) -> pd.DataFrame|None:
         evt_counter = 0
         p_list = [ [] for i in range(len(self.fit_params)) ]
         q_list = [ [] for i in range(len(self.fit_params)) ]
@@ -65,21 +66,22 @@ class Analysis():
             if not isinstance(source_position, float):
                 print(f"cant decode {filename=}. Skip")
                 continue
-            #waveforms = self.load_waveform(filename)
             waveforms = DigitizerEventData.create_from_file(filename)
-            with click.progressbar(range(len(waveforms[0])),label=f'Analyzing waveforms {nfile}/{len(self.files)} ({source_position}cm)') as wbar:
+            with click.progressbar(range(len(waveforms[0][:wf_num])),label=f'Analyzing waveforms {nfile}/{len(self.files)} ({source_position}cm)\t') as wbar:
                 for nevt in wbar:
-                    if nevt > self.read_limit:
+                    if self.read_limit and nevt > self.read_limit:
                         print(f'File to big. SKIP')
                         break
                     evt_counter += 1
                     for channel in range(self.channels):
                         p_list[0].append(evt_counter)
-                        p_list[1].append(source_position)
-                        p_list[2].append(channel)
+                        p_list[1].append(waveforms[channel][nevt].timestamp)
+                        p_list[2].append(source_position)
+                        p_list[3].append(channel)
+                        p_list[4].append(waveforms[channel][nevt].amplitude)
                         p,q = self.get_waveform_fit(fit_func, waveforms[channel][nevt].waveform) 
                         for i in range(len(p)):
-                            p_list[i+3].append(p[i])
+                            p_list[i+len(self.fit_params)-len(self.fit_sig)].append(p[i])
                             q_list[i].append(np.sqrt(np.diag(q))[i])
                         
                         #sns.lineplot(x=self.t, y=waveforms[0][nevt].waveform, label='CH0')
