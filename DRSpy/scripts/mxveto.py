@@ -36,7 +36,7 @@ class Analysis():
         self.df = pd.DataFrame()
         print(f'\nFound {len(self.files)} .root files. {self.T_samples=}, {self.channels=} \n')
 
-        self.fit_params = ['event', 'timestamp' , 'L', 'CH', 'A', 'V_r', 'V_f', 't_0', 't_r', 't_f', 'Q', 'dV', 'V_0']
+        self.fit_params = ['event', 'timestamp' , 'L', 'CH', 'A', 't_0', 't_r', 't_f', 'Q', 'dV', 'V_0']
         self.fit_sig = ['sig_t_0', 'sig_t_r', 'sig_t_f', 'sig_Q', 'sig_dV', 'sig_V_0']
         self.fit_params2 = ['L [cm]', 'CH', '$t_0$', '$t_r$', '$t_f$', '$Q$', '$dV$', '$V_0$']
         self.fit_sig2 = ['$\sigma t_0$', '$\sigma t_r', '$\sigma t_f$', '$\sigma Q$', '$\sigma dV$', '$\sigma V_0$']
