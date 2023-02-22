@@ -33,13 +33,18 @@ class Analysis():
         self.t = 0.2 * np.arange(0, self.T_samples)
 
         self.channels = len(evt)
-        self.df = pd.DataFrame()
+        self._df = pd.DataFrame()
+        self._ddf = pd.DataFrame()
         print(f'\nFound {len(self.files)} .root files. {self.T_samples=}, {self.channels=} \n')
 
-        self.fit_params = ['event', 'timestamp' , 'L', 'CH', 'A', 't_0', 't_r', 't_f', 'Q', 'dV', 'V_0']
-        self.fit_sig = ['sig_t_0', 'sig_t_r', 'sig_t_f', 'sig_Q', 'sig_dV', 'sig_V_0']
-        self.fit_params2 = ['L [cm]', 'CH', '$t_0$', '$t_r$', '$t_f$', '$Q$', '$dV$', '$V_0$']
-        self.fit_sig2 = ['$\sigma t_0$', '$\sigma t_r', '$\sigma t_f$', '$\sigma Q$', '$\sigma dV$', '$\sigma V_0$']
+
+        self.df_cols_latex = ['evt_ID', 'timestamp [a.u.]', 'L [cm]', 'Channel_ID', 'Amplitude [V]', '$t_0$ [ns]', '$t_r$ [ns]', '$t_f$ [ns]', 'Charge', '$dV$ [V]', '$V_0$ [V]']
+        self.df_cols_sigma_latex = ['$\sigma t_0$', '$\sigma t_r', '$\sigma t_f$', '$\sigma Q$', '$\sigma dV$', '$\sigma V_0$']
+        self.df_cols = ['event', 'timestamp', 'L', 'CH', 'A', 't_0', 't_r', 't_f', 'Q', 'dV', 'V_0']
+        self.df_cols_sigma = ['sig_t_0', 'sig_t_r', 'sig_t_f', 'sig_Q', 'sig_dV', 'sig_V_0']
+
+        self.ddf_cols_latex = ['evt_ID', '$t_0^{CH0}$ [ns]', 't_0^{CH1} [ns]', 'L [cm]', 'Q^{CH0}', 'Q^{CH1}', '$t_1^{CH1} - t_0^{CH0}$', '$\ln{\\frac{C_1}{C_0}}$', '$\sqrt{C_0C_1}$', '$\\frac{C_0-C_1}{C_1+C_1}$']
+        self.ddf_cols = ['event', 't_0_ch0', 't_0_ch1', 'L', 'Q_ch0', 'Q_ch1', 'dt', 'ln', 'sqrt', 'asym']
 
     def decode_filename(self, filename: str) -> float|bool:
         try:
@@ -59,8 +64,8 @@ class Analysis():
 
     def multi_loader(self, filename_decoder: Callable[str, float|bool], fit_func: Callable[Any, float], wf_num:int=-1) -> pd.DataFrame|None:
         evt_counter = 0
-        p_list = [ [] for i in range(len(self.fit_params)) ]
-        q_list = [ [] for i in range(len(self.fit_params)) ]
+        p_list = [ [] for i in range(len(self.df_cols)) ]
+        q_list = [ [] for i in range(len(self.df_cols)) ]
         for nfile, filename in enumerate(self.files):
             source_position = filename_decoder(filename.name)
             if not isinstance(source_position, float):
@@ -70,7 +75,7 @@ class Analysis():
             with click.progressbar(range(len(waveforms[0][:wf_num])),label=f'Analyzing waveforms {nfile}/{len(self.files)} ({source_position}cm)\t') as wbar:
                 for nevt in wbar:
                     if self.read_limit and nevt > self.read_limit:
-                        print(f'File to big. SKIP')
+                        print(f'\tFile to big. SKIP')
                         break
                     evt_counter += 1
                     for channel in range(self.channels):
@@ -81,7 +86,7 @@ class Analysis():
                         p_list[4].append(waveforms[channel][nevt].amplitude)
                         p,q = self.get_waveform_fit(fit_func, waveforms[channel][nevt].waveform) 
                         for i in range(len(p)):
-                            p_list[i+len(self.fit_params)-len(self.fit_sig)].append(p[i])
+                            p_list[i+len(self.df_cols)-len(self.df_cols_sigma)].append(p[i])
                             q_list[i].append(np.sqrt(np.diag(q))[i])
                         
                         #sns.lineplot(x=self.t, y=waveforms[0][nevt].waveform, label='CH0')
@@ -89,7 +94,7 @@ class Analysis():
                         #sns.lineplot(x=self.t, y=fit_func(self.t,*p0))
                         #sns.lineplot(x=self.t, y=fit_func(self.t,*p1))
                         #plt.show()
-        params_dict = dict(zip(self.fit_params+self.fit_sig, p_list+q_list))
+        params_dict = dict(zip(self.df_cols+self.df_cols_sigma, p_list+q_list))
         return params_dict
 
     def to_pandas(self, params_dict: Dict|str) -> Tuple[pd.DataFrame]:
@@ -106,16 +111,16 @@ class Analysis():
         del df['index']
         
         print('-> Calculating rel error')
-        tmp = [[] for i in range(len(self.fit_sig)-1)]
+        tmp = [[] for i in range(len(self.df_cols_sigma)-1)]
         with click.progressbar(range(len(df))) as bar:
             for i in bar:
                 for j in range(len(tmp)):
-                    diff = round(df.loc[i,df.columns[len(self.fit_params)+1+j]]/df.loc[i,df.columns[(len(self.fit_params)-len(self.fit_sig)+1)+j]],4)
+                    diff = round(df.loc[i,df.columns[len(self.df_cols)+1+j]]/df.loc[i,df.columns[(len(self.df_cols)-len(self.df_cols_sigma)+1)+j]],4)
                     if np.abs(diff) > 1 or diff == np.nan or np.abs(diff) == np.inf:
                         tmp[j].append(1)
                     else:
                         tmp[j].append(diff)
-        tmp = dict(zip('rel_'+df.columns[(len(self.fit_params)-len(self.fit_sig)+1):(len(self.fit_params)+1)], tmp))
+        tmp = dict(zip('rel_'+df.columns[(len(self.df_cols)-len(self.df_cols_sigma)+1):(len(self.df_cols)+1)], tmp))
         for i in tmp.keys():
             df[i] = tmp[i]
 
@@ -128,7 +133,7 @@ class Analysis():
         ddf = df_0.merge(df_1, how='inner', on=['event', 'L'], suffixes=['_ch0','_ch1'])
         ddf['dt'] = ddf.apply(lambda x: x.t_0_ch1-x.t_0_ch0, axis=1)
         ddf['ln'] = ddf.apply(lambda x: np.log(x.Q_ch1/x.Q_ch0), axis=1)
-        ddf['sqrt(c1c2)'] = ddf.apply(lambda x: np.sqrt(x.Q_ch1*x.Q_ch0), axis=1)
+        ddf['sqrt'] = ddf.apply(lambda x: np.sqrt(x.Q_ch1*x.Q_ch0), axis=1)
         ddf['asym'] = ddf.apply(lambda x: (x.Q_ch0-x.Q_ch1)/(x.Q_ch0+x.Q_ch1), axis=1)
         print('-> Filltering data...')
         ddf = ddf[(np.abs(ddf['asym'])<0) & (np.abs(ddf['ln']))<1 ]
