@@ -37,14 +37,15 @@ class Analysis():
         self._ddf = pd.DataFrame()
         print(f'\nFound {len(self.files)} .root files. {self.T_samples=}, {self.channels=} \n')
 
-
-        self.df_cols_latex = ['evt_ID', 'timestamp [a.u.]', 'L [cm]', 'Channel_ID', 'Amplitude [V]', '$t_0$ [ns]', '$t_r$ [ns]', '$t_f$ [ns]', 'Charge', '$dV$ [V]', '$V_0$ [V]']
-        self.df_cols_sigma_latex = ['$\sigma t_0$', '$\sigma t_r', '$\sigma t_f$', '$\sigma Q$', '$\sigma dV$', '$\sigma V_0$']
         self.df_cols = ['event', 'timestamp', 'L', 'CH', 'A', 't_0', 't_r', 't_f', 'Q', 'dV', 'V_0']
         self.df_cols_sigma = ['sig_t_0', 'sig_t_r', 'sig_t_f', 'sig_Q', 'sig_dV', 'sig_V_0']
-
-        self.ddf_cols_latex = ['evt_ID', '$t_0^{CH0}$ [ns]', 't_0^{CH1} [ns]', 'L [cm]', 'Q^{CH0}', 'Q^{CH1}', '$t_1^{CH1} - t_0^{CH0}$', '$\ln{\\frac{C_1}{C_0}}$', '$\sqrt{C_0C_1}$', '$\\frac{C_0-C_1}{C_1+C_1}$']
         self.ddf_cols = ['event', 't_0_ch0', 't_0_ch1', 'L', 'Q_ch0', 'Q_ch1', 'dt', 'ln', 'sqrt', 'asym']
+
+        df_cols_latex = ['evt_ID', 'timestamp [a.u.]', 'L [cm]', 'Channel_ID', 'Amplitude [V]', '$t_0$ [ns]', '$t_r$ [ns]', '$t_f$ [ns]', 'Charge', '$dV$ [V]', '$V_0$ [V]']
+        df_cols_sigma_latex = ['$\sigma t_0$', '$\sigma t_r', '$\sigma t_f$', '$\sigma Q$', '$\sigma dV$', '$\sigma V_0$']
+        ddf_cols_latex = ['evt_ID', '$t_0^{CH0}$ [ns]', 't_0^{CH1} [ns]', 'L [cm]', 'Q^{CH0}', 'Q^{CH1}', '$t_1^{CH1} - t_0^{CH0}$', '$\ln{\\frac{C_1}{C_0}}$', '$\sqrt{C_0C_1}$', '$\\frac{C_0-C_1}{C_1+C_1}$']
+        # change default df column names to LaTEX
+        self.lx = dict(zip(self.df_cols+self.df_cols_sigma+self.ddf_cols, df_cols_latex+df_cols_sigma_latex+ddf_cols_latex))
 
     def decode_filename(self, filename: str) -> float|bool:
         try:
@@ -131,16 +132,24 @@ class Analysis():
         df_0 = df[df['CH']==0][dcol]
         df_1 = df[df['CH']==1][dcol]
         ddf = df_0.merge(df_1, how='inner', on=['event', 'L'], suffixes=['_ch0','_ch1'])
-        ddf['dt'] = ddf.apply(lambda x: x.t_0_ch1-x.t_0_ch0, axis=1)
-        ddf['ln'] = ddf.apply(lambda x: np.log(x.Q_ch1/x.Q_ch0), axis=1)
-        ddf['sqrt'] = ddf.apply(lambda x: np.sqrt(x.Q_ch1*x.Q_ch0), axis=1)
-        ddf['asym'] = ddf.apply(lambda x: (x.Q_ch0-x.Q_ch1)/(x.Q_ch0+x.Q_ch1), axis=1)
+        ddf[self.ddf_cols[6]] = ddf.apply(lambda x: x.t_0_ch1-x.t_0_ch0, axis=1)
+        ddf[self.ddf_cols[7]] = ddf.apply(lambda x: np.log(x.Q_ch1/x.Q_ch0), axis=1)
+        ddf[self.ddf_cols[8]] = ddf.apply(lambda x: np.sqrt(x.Q_ch1*x.Q_ch0), axis=1)
+        ddf[self.ddf_cols[9]] = ddf.apply(lambda x: (x.Q_ch0-x.Q_ch1)/(x.Q_ch0+x.Q_ch1), axis=1)
         print('-> Filltering data...')
         ddf = ddf[(np.abs(ddf['asym'])<0) & (np.abs(ddf['ln']))<1 ]
         return df, ddf
 
+    def get_waveforms(self):
+        pass
 
-    def get_waveform_fit(self, fit_func: Callable[Any, float], waveform: np.ndarray):
+    def get_delay(self):
+        pass
+
+    def get_signal(self):
+        pass
+
+    def get_waveform_fit(self, fit_func: Callable[Any, float], waveform: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         get_t0 = lambda t_m, t_r, t_f: t_m - t_r * t_f / (t_f - t_r) * np.log(t_f/t_r)
         t_max = self.t[np.argmin(waveform)]
         t_r = 2.9
@@ -157,12 +166,6 @@ class Analysis():
         except: 
             return np.full((len(p0)), np.inf), np.full((len(p0),len(p0)), np.inf)
 
-        
-
-
-def get_t0(t_m, t_r, t_f):
-    return t_m - t_r * t_f / (t_f - t_r) * np.log(t_f/t_r)
-    #return t_m - t_r * np.log(t_f/t_r+1)
 
 def sig_fit(t, t0, t_r, t_f, Q, dV, V0=0):
 	return V0 + dV*t + np.heaviside(t-t0, 0) * Q/(t_r-t_f) * (np.exp(-(t-t0)/t_r) - np.exp(-(t-t0)/t_f)) 
@@ -259,23 +262,7 @@ def get_wf_params(root_filename):
 
         return [t0_0, dt0_0, t0_1, dt0_1, Q_0, dQ_0, Q_1, dQ_1]
 
-def decode_filename(filename):
-    return int(filename.split('_')[1])
-
-def main(path):
-    files = os.listdir(path)
-    L = []
-    T = []
-    with click.progressbar(files) as bar:
-        for _file in bar:
-            L.append(decode_filename(_file))
-            T.append(get_wf_params(os.path.join(argv[3], _file)))
-    return L, T
-
-
 if __name__ == '__main__':
-    #get_wf_params('sipm-tests2/mxveto_20_C.root')
-    #L,T = main(argv[3])
     print('Usage: python analysis.py <data_folder>')
     run = Analysis(argv[1])
     params = run.multi_loader(run.decode_filename, sig_fit)
