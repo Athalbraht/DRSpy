@@ -18,23 +18,24 @@ from typing import *
 sns.set_theme()
 
 class Analysis():
-    def __init__(self, data_path: Path, limit_file: Path|None=None):
-        self.data_path = Path(data_path)
+    def __init__(self, data_path: str, limit_file: str|None=None, charts_path: Path|None=None) -> None:
         self.files = []
-        for file in self.data_path.iterdir():
-            if file.suffix == '.root':
-                self.files.append(self.data_path.joinpath(file))
+        self._df = pd.DataFrame()
+        self._ddf = pd.DataFrame()
+
+        self.data_path = Path(data_path)
+        self.charts_path = Path(charts_path) id charts_path else False
+        self.read_limit = len(DigitizerEventData.create_from_file(limit_file)[0]) if limit_file else 0
+
         evt = DigitizerEventData.create_from_file(self.files[0])
-        if limit_file:
-            self.read_limit = len(DigitizerEventData.create_from_file(limit_file)[0])
-        else:
-            self.read_limit = 0
+        self.channels = len(evt)
         self.T_samples = len(evt[0][0].waveform)
         self.t = 0.2 * np.arange(0, self.T_samples)
 
-        self.channels = len(evt)
-        self._df = pd.DataFrame()
-        self._ddf = pd.DataFrame()
+        for file in self.data_path.iterdir():
+            if file.suffix == '.root':
+                self.files.append(self.data_path.joinpath(file))
+
         print(f'\nFound {len(self.files)} .root files. {self.T_samples=}, {self.channels=} \n')
 
         self.df_cols = ['event', 'timestamp', 'L', 'CH', 'A', 't_0', 't_r', 't_f', 'Q', 'dV', 'V_0']
@@ -89,12 +90,6 @@ class Analysis():
                         for i in range(len(p)):
                             p_list[i+len(self.df_cols)-len(self.df_cols_sigma)].append(p[i])
                             q_list[i].append(np.sqrt(np.diag(q))[i])
-                        
-                        #sns.lineplot(x=self.t, y=waveforms[0][nevt].waveform, label='CH0')
-                        #sns.lineplot(x=self.t, y=waveforms[1][nevt].waveform, label='CH1')
-                        #sns.lineplot(x=self.t, y=fit_func(self.t,*p0))
-                        #sns.lineplot(x=self.t, y=fit_func(self.t,*p1))
-                        #plt.show()
         params_dict = dict(zip(self.df_cols+self.df_cols_sigma, p_list+q_list))
         return params_dict
 
@@ -140,7 +135,7 @@ class Analysis():
         ddf = ddf[(np.abs(ddf['asym'])<0) & (np.abs(ddf['ln']))<1 ]
         return df, ddf
 
-    def get_waveforms(self):
+    def get_waveforms(self,):
         pass
 
     def get_delay(self):
