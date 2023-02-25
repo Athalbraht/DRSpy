@@ -8,7 +8,8 @@ import seaborn as sns
 import matplotlib.pyplot  as plt
 
 from sys import argv
-from DRSpy.plugins.digitizer_reader import *
+#from DRSpy.plugins.digitizer_reader import *
+from digitizer_reader import *
 from scipy.optimize import curve_fit 
 from scipy import stats
 
@@ -20,21 +21,37 @@ sns.set_theme()
 class Analysis():
     def __init__(self, data_path: str, limit_file: str|None=None, charts_path: Path|None=None) -> None:
         self.files = []
-        self._df = pd.DataFrame()
-        self._ddf = pd.DataFrame()
+        self.df = pd.DataFrame()
+        self.ddf = pd.DataFrame()
 
         self.data_path = Path(data_path)
-        self.charts_path = Path(charts_path) id charts_path else False
+        if charts_path:
+            self.charts_path = Path(charts_path)
+            if self.charts_path.exists(): self.charts_path.mkdir()
+        else:
+            self.charts_path = False
         self.read_limit = len(DigitizerEventData.create_from_file(limit_file)[0]) if limit_file else 0
+
+        choice = 0
+        for file in self.data_path.iterdir() :
+            if file.suffix == '.df' and not choice:
+                print('---------------------------------')
+                df_files = {f'{i}':df_file for i, df_file in enumerate(self.data_path.iterdir()) if df_file.suffix == '.df'}
+                for df_file in df_files: print(f'\tID:{df_file}\t{df_files[df_file].name}')
+                print('---------------------------------')
+                print(f'->\tFound DataFrame files in {self.data_path}.\n\tLoad file? [<ID>/N]')
+                choice = input('Choice: ')
+                if df_files.get(choice, False):
+                    print('->\tLoading DataFrames...')
+                    self.df = pd.read_pickle(df_files[choice].absolute())
+                    self.ddf = pd.read_pickle(df_files[choice].with_suffix('.ddf').absolute())
+            if file.suffix == '.root':
+                self.files.append(self.data_path.joinpath(file))
 
         evt = DigitizerEventData.create_from_file(self.files[0])
         self.channels = len(evt)
         self.T_samples = len(evt[0][0].waveform)
         self.t = 0.2 * np.arange(0, self.T_samples)
-
-        for file in self.data_path.iterdir():
-            if file.suffix == '.root':
-                self.files.append(self.data_path.joinpath(file))
 
         print(f'\nFound {len(self.files)} .root files. {self.T_samples=}, {self.channels=} \n')
 
