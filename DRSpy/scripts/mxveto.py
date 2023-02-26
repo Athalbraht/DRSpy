@@ -8,8 +8,8 @@ import seaborn as sns
 import matplotlib.pyplot  as plt
 
 from sys import argv
-#from DRSpy.plugins.digitizer_reader import *
-from digitizer_reader import *
+from DRSpy.plugins.digitizer_reader import *
+#from digitizer_reader import *
 from scipy.optimize import curve_fit 
 from scipy import stats
 
@@ -53,15 +53,15 @@ class Analysis():
         self.T_samples = len(evt[0][0].waveform)
         self.t = 0.2 * np.arange(0, self.T_samples)
 
-        print(f'\nFound {len(self.files)} .root files. {self.T_samples=}, {self.channels=} \n')
+        print(f'\n->\tFound:\n\t*\t{len(self.files)} .root files\n\t*\t{self.T_samples=}\n\t*\t{self.channels=}\n')
 
         self.df_cols = ['event', 'timestamp', 'L', 'CH', 'A', 't_0', 't_r', 't_f', 'Q', 'dV', 'V_0']
         self.df_cols_sigma = ['sig_t_0', 'sig_t_r', 'sig_t_f', 'sig_Q', 'sig_dV', 'sig_V_0']
-        self.ddf_cols = ['event', 't_0_ch0', 't_0_ch1', 'L', 'Q_ch0', 'Q_ch1', 'dt', 'ln', 'sqrt', 'asym']
+        self.ddf_cols = ['event', 't_0_ch0', 't_0_ch1', 'L', 'Q_ch0', 'Q_ch1', 'dt', 'ln', 'sqrt', 'asym', 'A_ch0', 'A_ch1']
 
         df_cols_latex = ['evt_ID', 'timestamp [a.u.]', 'L [cm]', 'Channel_ID', 'Amplitude [V]', '$t_0$ [ns]', '$t_r$ [ns]', '$t_f$ [ns]', 'Charge', '$dV$ [V]', '$V_0$ [V]']
         df_cols_sigma_latex = ['$\sigma t_0$', '$\sigma t_r', '$\sigma t_f$', '$\sigma Q$', '$\sigma dV$', '$\sigma V_0$']
-        ddf_cols_latex = ['evt_ID', '$t_0^{CH0}$ [ns]', 't_0^{CH1} [ns]', 'L [cm]', 'Q^{CH0}', 'Q^{CH1}', '$t_1^{CH1} - t_0^{CH0}$', '$\ln{\\frac{C_1}{C_0}}$', '$\sqrt{C_0C_1}$', '$\\frac{C_0-C_1}{C_1+C_1}$']
+        ddf_cols_latex = ['evt_ID', '$t_0^{CH0}$ [ns]', 't_0^{CH1} [ns]', 'L [cm]', 'Q^{CH0}', 'Q^{CH1}', 'Amplitude CH0 [V]', 'Amplitude CH1 [V]', '$t_1^{CH1} - t_0^{CH0}$', '$\ln{\\frac{C_1}{C_0}}$', '$\sqrt{C_0C_1}$', '$\\frac{C_0-C_1}{C_1+C_1}$']
         # change default df column names to LaTEX
         self.lx = dict(zip(self.df_cols+self.df_cols_sigma+self.ddf_cols, df_cols_latex+df_cols_sigma_latex+ddf_cols_latex))
 
@@ -88,13 +88,13 @@ class Analysis():
         for nfile, filename in enumerate(self.files):
             source_position = filename_decoder(filename.name)
             if not isinstance(source_position, float):
-                print(f"cant decode {filename=}. Skip")
+                print(f'\t->\tcant decode {filename=}. Skip')
                 continue
             waveforms = DigitizerEventData.create_from_file(filename)
             with click.progressbar(range(len(waveforms[0][:wf_num])),label=f'Analyzing waveforms {nfile}/{len(self.files)} ({source_position}cm)\t') as wbar:
                 for nevt in wbar:
                     if self.read_limit and nevt > self.read_limit:
-                        print(f'\tFile to big. SKIP')
+                        print('\n\t->\tFile to big. SKIP')
                         break
                     evt_counter += 1
                     for channel in range(self.channels):
@@ -111,19 +111,18 @@ class Analysis():
         return params_dict
 
     def to_pandas(self, params_dict: Dict|str) -> Tuple[pd.DataFrame]:
-        print('-> Creating DataFrame')
+        print('->\tCreating DataFrame')
         if isinstance(params_dict, str):
             df = pd.read_csv(params_dict)
         else:
             df = pd.DataFrame(params_dict)
-        dcol = ['event','t_0', 'L', 'Q']
-        print('-> Clearing nan and inf values')
+        dcol = ['event','t_0', 'L', 'Q', 'A']
+        print('->\tClearing nan and inf values')
         df.replace([np.inf,-np.inf], np.nan, inplace=True)
-        df = df.dropna()
-        df = df.reset_index()
-        del df['index']
+        df.dropna(inplace=True)
+        df.reset_index(inplace=True, drop=True)
         
-        print('-> Calculating rel error')
+        print('->\tCalculating rel error')
         tmp = [[] for i in range(len(self.df_cols_sigma)-1)]
         with click.progressbar(range(len(df))) as bar:
             for i in bar:
@@ -137,18 +136,16 @@ class Analysis():
         for i in tmp.keys():
             df[i] = tmp[i]
 
-        print('-> Filltering data...')
+        print('->\tFilltering data...')
         df = df[(df['t_r'] > 0) & (df['t_f'] > 0) & (df['t_r'] < 10) & (df['t_f'] < 10) & (df['t_0'] >20) & (df['t_0'] < 80) & (df['Q'] <= 0) & (df['Q'] > -5)]
 
-        print('-> Calculating asymeties')
-        df_0 = df[df['CH']==0][dcol]
-        df_1 = df[df['CH']==1][dcol]
-        ddf = df_0.merge(df_1, how='inner', on=['event', 'L'], suffixes=['_ch0','_ch1'])
+        print('->\tCalculating asymeties')
+        ddf = df[df['CH']==0][dcol].merge(df[df['CH']==1][dcol], how='inner', on=['event', 'L'], suffixes=['_ch0','_ch1'])
         ddf[self.ddf_cols[6]] = ddf.apply(lambda x: x.t_0_ch1-x.t_0_ch0, axis=1)
         ddf[self.ddf_cols[7]] = ddf.apply(lambda x: np.log(x.Q_ch1/x.Q_ch0), axis=1)
         ddf[self.ddf_cols[8]] = ddf.apply(lambda x: np.sqrt(x.Q_ch1*x.Q_ch0), axis=1)
         ddf[self.ddf_cols[9]] = ddf.apply(lambda x: (x.Q_ch0-x.Q_ch1)/(x.Q_ch0+x.Q_ch1), axis=1)
-        print('-> Filltering data...')
+        print('->\tFilltering data...')
         ddf = ddf[(np.abs(ddf['asym'])<0) & (np.abs(ddf['ln']))<1 ]
         return df, ddf
 
