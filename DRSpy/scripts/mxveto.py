@@ -65,6 +65,8 @@ class Analysis():
         # change default df column names to LaTEX
         self.lx = dict(zip(self.df_cols+self.df_cols_sigma+self.ddf_cols, df_cols_latex+df_cols_sigma_latex+ddf_cols_latex))
 
+        self.line_plot_style = {'ls':'-', 'lw':1}
+
     def decode_filename(self, filename: str) -> float|bool:
         try:
             position = float(filename.split('_')[1])
@@ -149,8 +151,15 @@ class Analysis():
         ddf = ddf[(np.abs(ddf['asym'])<0) & (np.abs(ddf['ln']))<1 ]
         return df, ddf
 
-    def get_waveforms(self,):
-        pass
+    def get_waveforms(self, w0, w1, fit_func, note) -> None:
+        g = sns.lineplot(x=self.t, y=w0, color='green', label='CH0', **self.line_plot_style)
+        sns.lineplot(x=self.t, y=w1, color='red', label='CH1', **self.line_plot_style)
+        sns.lineplot(x=self.t, y=fit_func(t,*p0), color='green', **self.line_plot_style)
+        sns.lineplot(x=self.t, y=fit_func(t,*p1), color='red', **self.line_plot_style)
+        g.annotate(note, size=10, xy={0,np.min(np.append(w0, w1)/2)} )
+        #g.axvline(30, ls='--', lw=0.9, c='red')
+        plt.show()
+
 
     def get_delay(self):
         pass
