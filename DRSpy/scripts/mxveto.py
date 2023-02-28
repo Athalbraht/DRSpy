@@ -161,11 +161,48 @@ class Analysis():
         plt.show()
 
 
-    def get_delay(self):
-        pass
+    def get_delay(self, fit_func):
+        df = self.ddf.groupby('L').mean().reset_index()
+        p, q = curve_fit(fit_func, df['L'], df['dt'])
+        c = -2/p[0]
+        sns.lineplot(data=self.df, x='L', y='dt', **self.line_plot_style)
+        sns.lineplot(x=df['L'], y=fit_func(df['L'], *p), **self.line_plot_style, ls='--', color='black')
+        plt.show()
+        sns.histplot(data=self.df, x='L', y='dt', cbar=True)
+        sns.lineplot(x=df['L'], y=fit_func(df['L'], *p), **self.line_plot_style, ls='--', color='black')
+        plt.ylim(-20,20)
+        plt.show()
 
-    def get_signal(self):
-        pass
+    def get_signal(self, fit_func):
+        df = self.ddf.groupby('L').mean().reset_index()
+        p, q = curve_fit(fit_func, df['L'], df['ln'])
+        c = 2/p[0]
+        sns.lineplot(data=self.df, x='L', y='ln', **self.line_plot_style)
+        sns.lineplot(x=df['L'], y=fit_func(df['L'], *p), **self.line_plot_style, ls='--', color='black')
+        plt.show()
+        sns.histplot(data=self.df, x='L', y='ln', cbar=True)
+        sns.lineplot(x=df['L'], y=fit_func(df['L'], *p), **self.line_plot_style, ls='--', color='black')
+        plt.ylim(-4,4)
+        plt.show()
+        sns.lineplot(data=self.df, x='L', y='sqrt', **self.line_plot_style, color='black')
+        plt.show()
+        sns.lineplot(data=self.df, x='L', y='asym', **self.line_plot_style, color='black')
+        plt.show()
+        sns.lineplot(data=self.df, x='L', y='Q_ch0', **self.line_plot_style, color='red')
+        sns.lineplot(data=self.df, x='L', y='Q_ch1', **self.line_plot_style, color='blue')
+        plt.show()
+        sns.lineplot(data=self.df, x='L', y='A_ch0', **self.line_plot_style, color='red')
+        sns.lineplot(data=self.df, x='L', y='A_ch1', **self.line_plot_style, color='blue')
+        plt.show()
+
+    def get_time(self):
+        sns.jointplot(data=self.ddf, x='t_0_ch0', y='t_0_ch1',kind='hist')
+        plt.show()
+        sns.jointplot(data=ddf,x='dt', y='ln',kind='hist')
+        plt.show()
+        sns.jointplot(data=ddf,x='t_r', y='t_f',kind='hist')
+        plt.show()
+
 
     def get_waveform_fit(self, fit_func: Callable[Any, float], waveform: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         get_t0 = lambda t_m, t_r, t_f: t_m - t_r * t_f / (t_f - t_r) * np.log(t_f/t_r)
@@ -184,6 +221,8 @@ class Analysis():
         except: 
             return np.full((len(p0)), np.inf), np.full((len(p0),len(p0)), np.inf)
 
+def lin_fit(x, a, b):
+    return a*x+b
 
 def sig_fit(t, t0, t_r, t_f, Q, dV, V0=0):
 	return V0 + dV*t + np.heaviside(t-t0, 0) * Q/(t_r-t_f) * (np.exp(-(t-t0)/t_r) - np.exp(-(t-t0)/t_f)) 
