@@ -11,6 +11,7 @@ from sys import argv
 from DRSpy.plugins.digitizer_reader import *
 #from digitizer_reader import *
 from scipy.optimize import curve_fit 
+from scipy.special import erf
 from scipy import stats
 
 from pathlib import Path
@@ -57,11 +58,11 @@ class Analysis():
 
         self.df_cols = ['event', 'timestamp', 'L', 'CH', 'A', 't_0', 't_r', 't_f', 'Q', 'dV', 'V_0']
         self.df_cols_sigma = ['sig_t_0', 'sig_t_r', 'sig_t_f', 'sig_Q', 'sig_dV', 'sig_V_0']
-        self.ddf_cols = ['event', 't_0_ch0', 't_0_ch1', 'L', 'Q_ch0', 'Q_ch1', 'dt', 'ln', 'sqrt', 'asym', 'A_ch0', 'A_ch1']
+        self.ddf_cols = ['event', 't_0_ch0', 't_0_ch1', 'L', 'Q_ch0', 'Q_ch1', 'A_ch0', 'A_ch1', 'dt', 'lnQ', 'sqrtQ', 'asymQ', 'lnA', 'sqrtA', 'asymA']
 
         df_cols_latex = ['evt_ID', 'timestamp [a.u.]', 'L [cm]', 'Channel_ID', 'Amplitude [V]', '$t_0$ [ns]', '$t_r$ [ns]', '$t_f$ [ns]', 'Charge', '$dV$ [V]', '$V_0$ [V]']
         df_cols_sigma_latex = ['$\sigma t_0$', '$\sigma t_r', '$\sigma t_f$', '$\sigma Q$', '$\sigma dV$', '$\sigma V_0$']
-        ddf_cols_latex = ['evt_ID', '$t_0^{CH0}$ [ns]', 't_0^{CH1} [ns]', 'L [cm]', 'Q^{CH0}', 'Q^{CH1}', 'Amplitude CH0 [V]', 'Amplitude CH1 [V]', '$t_1^{CH1} - t_0^{CH0}$', '$\ln{\\frac{C_1}{C_0}}$', '$\sqrt{C_0C_1}$', '$\\frac{C_0-C_1}{C_1+C_1}$']
+        ddf_cols_latex = ['evt_ID', '$t_0^{CH0}$ [ns]', 't_0^{CH1} [ns]', 'L [cm]', 'Q^{CH0}', 'Q^{CH1}', 'Amplitude CH0 [V]', 'Amplitude CH1 [V]', '$t_1^{CH1} - t_0^{CH0}$', '$`\ln{\\frac{Q_1}{Q_0}}$', '$\sqrt{Q_0Q_1}$', '$\\frac{Q_0-Q_1}{Q_1+Q_1}$', '$`\ln{\\frac{A_1}{A_0}}$', '$\sqrt{A_0A_1}$', '$\\frac{A_0-A_1}{A_1+A_1}$']
         # change default df column names to LaTEX
         self.lx = dict(zip(self.df_cols+self.df_cols_sigma+self.ddf_cols, df_cols_latex+df_cols_sigma_latex+ddf_cols_latex))
 
@@ -143,12 +144,15 @@ class Analysis():
 
         print('->\tCalculating asymeties')
         ddf = df[df['CH']==0][dcol].merge(df[df['CH']==1][dcol], how='inner', on=['event', 'L'], suffixes=['_ch0','_ch1'])
-        ddf[self.ddf_cols[6]] = ddf.apply(lambda x: x.t_0_ch1-x.t_0_ch0, axis=1)
-        ddf[self.ddf_cols[7]] = ddf.apply(lambda x: np.log(x.Q_ch1/x.Q_ch0), axis=1)
-        ddf[self.ddf_cols[8]] = ddf.apply(lambda x: np.sqrt(x.Q_ch1*x.Q_ch0), axis=1)
-        ddf[self.ddf_cols[9]] = ddf.apply(lambda x: (x.Q_ch0-x.Q_ch1)/(x.Q_ch0+x.Q_ch1), axis=1)
+        ddf[self.ddf_cols[8]] = ddf.apply(lambda x: x.t_0_ch1-x.t_0_ch0, axis=1)
+        ddf[self.ddf_cols[9]] = ddf.apply(lambda x: np.log(x.Q_ch1/x.Q_ch0), axis=1)
+        ddf[self.ddf_cols[10]] = ddf.apply(lambda x: np.sqrt(x.Q_ch1*x.Q_ch0), axis=1)
+        ddf[self.ddf_cols[11]] = ddf.apply(lambda x: (x.Q_ch0-x.Q_ch1)/(x.Q_ch0+x.Q_ch1), axis=1)
+        ddf[self.ddf_cols[12]] = ddf.apply(lambda x: np.log(x.A_ch1/x.A_ch0), axis=1)
+        ddf[self.ddf_cols[13]] = ddf.apply(lambda x: np.sqrt(x.A_ch1*x.A_ch0), axis=1)
+        ddf[self.ddf_cols[14]] = ddf.apply(lambda x: (x.A_ch0-x.A_ch1)/(x.A_ch0+x.A_ch1), axis=1)
         print('->\tFilltering data...')
-        ddf = ddf[(np.abs(ddf['asym'])<0) & (np.abs(ddf['ln']))<1 ]
+        ddf = ddf[(np.abs(ddf['asym'])<4) & (np.abs(ddf['ln']))<4]
         return df, ddf
 
     def get_waveforms(self, w0, w1, fit_func, note) -> None:
@@ -164,7 +168,8 @@ class Analysis():
     def get_delay(self, fit_func):
         df = self.ddf.groupby('L').mean().reset_index()
         p, q = curve_fit(fit_func, df['L'], df['dt'])
-        c = -2/p[0]
+        c = round(-2/p[0],2)
+        print('f->\tFound {c=} +- cm/ns')
         sns.lineplot(data=self.df, x='L', y='dt', **self.line_plot_style)
         sns.lineplot(x=df['L'], y=fit_func(df['L'], *p), **self.line_plot_style, ls='--', color='black')
         plt.show()
@@ -175,18 +180,35 @@ class Analysis():
 
     def get_signal(self, fit_func):
         df = self.ddf.groupby('L').mean().reset_index()
-        p, q = curve_fit(fit_func, df['L'], df['ln'])
-        c = 2/p[0]
-        sns.lineplot(data=self.df, x='L', y='ln', **self.line_plot_style)
+        p, q = curve_fit(fit_func, df['L'], df['lnQ'])
+        lm = round(2/p[0],2)
+        print('f->\tFound (Q) {lm=} +- cm')
+        sns.lineplot(data=self.df, x='L', y='lnQ', **self.line_plot_style)
         sns.lineplot(x=df['L'], y=fit_func(df['L'], *p), **self.line_plot_style, ls='--', color='black')
         plt.show()
-        sns.histplot(data=self.df, x='L', y='ln', cbar=True)
+        sns.histplot(data=self.df, x='L', y='lnQ', cbar=True)
         sns.lineplot(x=df['L'], y=fit_func(df['L'], *p), **self.line_plot_style, ls='--', color='black')
         plt.ylim(-4,4)
         plt.show()
-        sns.lineplot(data=self.df, x='L', y='sqrt', **self.line_plot_style, color='black')
+
+        p, q = curve_fit(fit_func, df['L'], df['lnA'])
+        lm = round(2/p[0],2)
+        print('f->\tFound (A) {lm=} +- cm')
+        sns.lineplot(data=self.df, x='L', y='lnA', **self.line_plot_style)
+        sns.lineplot(x=df['L'], y=fit_func(df['L'], *p), **self.line_plot_style, ls='--', color='black')
         plt.show()
-        sns.lineplot(data=self.df, x='L', y='asym', **self.line_plot_style, color='black')
+        sns.histplot(data=self.df, x='L', y='lnA', cbar=True)
+        sns.lineplot(x=df['L'], y=fit_func(df['L'], *p), **self.line_plot_style, ls='--', color='black')
+        plt.ylim(-4,4)
+        plt.show()
+
+        sns.lineplot(data=self.df, x='L', y='sqrtQ', **self.line_plot_style, color='black')
+        plt.show()
+        sns.lineplot(data=self.df, x='L', y='asymQ', **self.line_plot_style, color='black')
+        plt.show()
+        sns.lineplot(data=self.df, x='L', y='sqrtA', **self.line_plot_style, color='black')
+        plt.show()
+        sns.lineplot(data=self.df, x='L', y='asymA', **self.line_plot_style, color='black')
         plt.show()
         sns.lineplot(data=self.df, x='L', y='Q_ch0', **self.line_plot_style, color='red')
         sns.lineplot(data=self.df, x='L', y='Q_ch1', **self.line_plot_style, color='blue')
@@ -221,8 +243,17 @@ class Analysis():
         except: 
             return np.full((len(p0)), np.inf), np.full((len(p0),len(p0)), np.inf)
 
+def asymgauss_fit(x, m0, m1, m2):
+    amp = (m0 / (m2 * np.sqrt(2 * np.pi)))
+    spread = np.exp((-(x - m1)**2 ) / (2 * m2**2))
+    skew = (1 + erf((m3 * (x - m1)) / (m2 * np.sqrt(2))))
+    return amp*spread*skew
+
 def lin_fit(x, a, b):
     return a*x+b
+
+def landau_fit(x, E, S, N):
+    return N/np.sqrt(2*np.pi) * np.exp((((E-x)/S)-np.exp(-((x-E)/S))) /2)
 
 def sig_fit(t, t0, t_r, t_f, Q, dV, V0=0):
 	return V0 + dV*t + np.heaviside(t-t0, 0) * Q/(t_r-t_f) * (np.exp(-(t-t0)/t_r) - np.exp(-(t-t0)/t_f)) 
