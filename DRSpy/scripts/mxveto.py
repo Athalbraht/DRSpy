@@ -21,18 +21,24 @@ sns.set_theme()
 
 class Analysis():
     def __init__(self, data_path: str, limit_file: str|None=None, charts_path: Path|None=None) -> None:
+        '''
+        data_path:      path to folder with .root files
+        limit_file:     path to .root file. Reading events from other files will be limited to limit_file size.
+        charts_path:    path to plots output folder
+        '''
+        # init params
         self.files = []
         self.df = pd.DataFrame()
         self.ddf = pd.DataFrame()
-
         self.data_path = Path(data_path)
+        # Check charts_path
         if charts_path:
             self.charts_path = Path(charts_path)
-            if self.charts_path.exists(): self.charts_path.mkdir()
-        else:
-            self.charts_path = False
+            if not self.charts_path.exists(): self.charts_path.mkdir()
+        else: self.charts_path = False
+        # Check limit_file
         self.read_limit = len(DigitizerEventData.create_from_file(limit_file)[0]) if limit_file else 0
-
+        # Read self.data_path
         choice = 0
         for file in self.data_path.iterdir() :
             if file.suffix == '.df' and not choice:
@@ -48,34 +54,37 @@ class Analysis():
                     self.ddf = pd.read_pickle(df_files[choice].with_suffix('.ddf').absolute())
             if file.suffix == '.root':
                 self.files.append(self.data_path.joinpath(file))
-
+        # Get waveform properties
         evt = DigitizerEventData.create_from_file(self.files[0])
         self.channels = len(evt)
         self.T_samples = len(evt[0][0].waveform)
         self.t = 0.2 * np.arange(0, self.T_samples)
-
-        print(f'\n->\tFound:\n\t*\t{len(self.files)} .root files\n\t*\t{self.T_samples=}\n\t*\t{self.channels=}\n')
-
+        # Define graphs styling
+        self.chart_ext = 'pdf'
+        sns.set_theme()
+        self.line_plot_style = {'ls':'-', 'lw':1}
+        # Define DataFrame column names
         self.df_cols = ['event', 'timestamp', 'L', 'CH', 'A', 't_0', 't_r', 't_f', 'Q', 'dV', 'V_0']
         self.df_cols_sigma = ['sig_t_0', 'sig_t_r', 'sig_t_f', 'sig_Q', 'sig_dV', 'sig_V_0']
         self.ddf_cols = ['event', 't_0_ch0', 't_0_ch1', 'L', 'Q_ch0', 'Q_ch1', 'A_ch0', 'A_ch1', 'dt', 'lnQ', 'sqrtQ', 'asymQ', 'lnA', 'sqrtA', 'asymA']
-
         df_cols_latex = ['evt_ID', 'timestamp [a.u.]', 'L [cm]', 'Channel_ID', 'Amplitude [V]', '$t_0$ [ns]', '$t_r$ [ns]', '$t_f$ [ns]', 'Charge', '$dV$ [V]', '$V_0$ [V]']
         df_cols_sigma_latex = ['$\sigma t_0$', '$\sigma t_r', '$\sigma t_f$', '$\sigma Q$', '$\sigma dV$', '$\sigma V_0$']
         ddf_cols_latex = ['evt_ID', '$t_0^{CH0}$ [ns]', 't_0^{CH1} [ns]', 'L [cm]', 'Q^{CH0}', 'Q^{CH1}', 'Amplitude CH0 [V]', 'Amplitude CH1 [V]', '$t_1^{CH1} - t_0^{CH0}$', '$`\ln{\\frac{Q_1}{Q_0}}$', '$\sqrt{Q_0Q_1}$', '$\\frac{Q_0-Q_1}{Q_1+Q_1}$', '$`\ln{\\frac{A_1}{A_0}}$', '$\sqrt{A_0A_1}$', '$\\frac{A_0-A_1}{A_1+A_1}$']
         # change default df column names to LaTEX
         self.lx = dict(zip(self.df_cols+self.df_cols_sigma+self.ddf_cols, df_cols_latex+df_cols_sigma_latex+ddf_cols_latex))
 
-        self.line_plot_style = {'ls':'-', 'lw':1}
+        print(f'\n->\tFound:\n\t*\t{len(self.files)} .root files\n\t*\t{self.T_samples=}\n\t*\t{self.channels=}\n')
 
-    def decode_filename(self, filename: str) -> float|bool:
+    def decode_filename(self, filename: str, separator: str='_', pos: int=1) -> float|bool:
+        '''Extract position data from filename'''
         try:
-            position = float(filename.split('_')[1])
+            position = float(filename.split(separator)[pos])
             return position
         except: 
             return False
 
     def load_waveform(self, root_filename: Path) -> List[Any]:
+        '''TMP'''
         events = DigitizerEventData.create_from_file(root_filename)
         waveforms = [] #waveform[channel] = [waveforms list, amplitudes list]
         for channel in range(self.channels):
@@ -85,19 +94,20 @@ class Analysis():
         return waveforms
 
     def multi_loader(self, filename_decoder: Callable[str, float|bool], fit_func: Callable[Any, float], wf_num:int=-1) -> pd.DataFrame|None:
+        '''Load waveforms from self.data_path'''
         evt_counter = 0
-        p_list = [ [] for i in range(len(self.df_cols)) ]
+        p_list = [ [] for i in range(len(self.df_cols)) ] # params & cov list
         q_list = [ [] for i in range(len(self.df_cols)) ]
         for nfile, filename in enumerate(self.files):
             source_position = filename_decoder(filename.name)
             if not isinstance(source_position, float):
-                print(f'\t->\tcant decode {filename=}. Skip')
+                print(f'\n\t->\tcant decode {filename=}. Skip')
                 continue
             waveforms = DigitizerEventData.create_from_file(filename)
             with click.progressbar(range(len(waveforms[0][:wf_num])),label=f'Analyzing waveforms {nfile}/{len(self.files)} ({source_position}cm)\t') as wbar:
                 for nevt in wbar:
                     if self.read_limit and nevt > self.read_limit:
-                        print('\n\t->\tFile to big. SKIP')
+                        print('\n\t->\tFile is to big. SKIP')
                         break
                     evt_counter += 1
                     for channel in range(self.channels):
