@@ -1,6 +1,8 @@
+__version__ = 'v0.1'
 from __future__ import annotations
 
 import os
+import toml
 import click
 import numpy as np
 import pandas as pd
@@ -63,6 +65,7 @@ class Analysis():
         self.chart_ext = 'pdf'
         sns.set_theme()
         self.line_plot_style = {'ls':'-', 'lw':1}
+        # ADD translator func
         # Define DataFrame column names
         self.df_cols = ['event', 'timestamp', 'L', 'CH', 'A', 't_0', 't_r', 't_f', 'Q', 'dV', 'V_0']
         self.df_cols_sigma = ['sig_t_0', 'sig_t_r', 'sig_t_f', 'sig_Q', 'sig_dV', 'sig_V_0']
@@ -73,7 +76,25 @@ class Analysis():
         # change default df column names to LaTEX
         self.lx = dict(zip(self.df_cols+self.df_cols_sigma+self.ddf_cols, df_cols_latex+df_cols_sigma_latex+ddf_cols_latex))
 
-        print(f'\n->\tFound:\n\t*\t{len(self.files)} .root files\n\t*\t{self.T_samples=}\n\t*\t{self.channels=}\n')
+        self.toml_manager()
+        print(f'\n->\tFound:\n\t\t* {len(self.files)} .root files\n\t\t* {self.T_samples=}\n\t\t* {self.channels=}\n')
+
+    def toml_manager(self) -> None:
+        '''Init and read config.toml'''
+        print('\->\tChecking config.toml...')
+        self.config_path = Path(self.data_path.joinpath('config.toml'))
+        if self.config_path.exists():
+            self.data = toml.load(self.config_path)
+        else:
+            print('\t->File not found. Initialization...')
+            self.data = {'metadata' :   {},
+                         'filters'  :   {},
+                         'style'    :   {},
+                         'history'  :   {},
+                         'progress' :   {},}
+            self.config_path.touch()
+            data['mxveto_version'] = __version__
+            self.dump(self.config_path)
 
     def decode_filename(self, filename: str, separator: str='_', pos: int=1) -> float|bool:
         '''Extract position data from filename'''
@@ -93,7 +114,7 @@ class Analysis():
             waveforms[channel].append([event.amplitude for event in events[channel]])
         return waveforms
 
-    def multi_loader(self, filename_decoder: Callable[str, float|bool], fit_func: Callable[Any, float], wf_num:int=-1) -> pd.DataFrame|None:
+    def load_waveforms(self, filename_decoder: Callable[str, float|bool], fit_func: Callable[Any, float], wf_num:int=-1) -> pd.DataFrame:
         '''Load waveforms from self.data_path'''
         evt_counter = 0
         p_list = [ [] for i in range(len(self.df_cols)) ] # params & cov list
@@ -111,6 +132,7 @@ class Analysis():
                         break
                     evt_counter += 1
                     for channel in range(self.channels):
+                        # FIX
                         p_list[0].append(evt_counter)
                         p_list[1].append(waveforms[channel][nevt].timestamp)
                         p_list[2].append(source_position)
@@ -121,14 +143,15 @@ class Analysis():
                             p_list[i+len(self.df_cols)-len(self.df_cols_sigma)].append(p[i])
                             q_list[i].append(np.sqrt(np.diag(q))[i])
         params_dict = dict(zip(self.df_cols+self.df_cols_sigma, p_list+q_list))
-        return params_dict
+        return pd.DataFrame(params_dict)
 
-    def to_pandas(self, params_dict: Dict|str) -> Tuple[pd.DataFrame]:
+    def prepare(self, raw_df: pd.DataFrame|str) -> Tuple[pd.DataFrame]:
+        '''Filter raw DataFrame and extract only useful entries. The method generates filtered df with relative errors, groups by event and source position (ddf) and '''
         print('->\tCreating DataFrame')
-        if isinstance(params_dict, str):
-            df = pd.read_csv(params_dict)
+        if isinstance(raw_df, str):
+            df = pd.read_csv(raw_df)
         else:
-            df = pd.DataFrame(params_dict)
+            df = pd.DataFrame(raw_df)
         dcol = ['event','t_0', 'L', 'Q', 'A']
         print('->\tClearing nan and inf values')
         df.replace([np.inf,-np.inf], np.nan, inplace=True)
@@ -149,7 +172,7 @@ class Analysis():
         for i in tmp.keys():
             df[i] = tmp[i]
 
-        print('->\tFilltering data...')
+        print('->\tFiltering df data...')
         df = df[(df['t_r'] > 0) & (df['t_f'] > 0) & (df['t_r'] < 10) & (df['t_f'] < 10) & (df['t_0'] >20) & (df['t_0'] < 80) & (df['Q'] <= 0) & (df['Q'] > -5)]
 
         print('->\tCalculating asymeties')
@@ -161,16 +184,17 @@ class Analysis():
         ddf[self.ddf_cols[12]] = ddf.apply(lambda x: np.log(x.A_ch1/x.A_ch0), axis=1)
         ddf[self.ddf_cols[13]] = ddf.apply(lambda x: np.sqrt(x.A_ch1*x.A_ch0), axis=1)
         ddf[self.ddf_cols[14]] = ddf.apply(lambda x: (x.A_ch0-x.A_ch1)/(x.A_ch0+x.A_ch1), axis=1)
-        print('->\tFilltering data...')
+        print('->\tFiltering ddf data...')
         ddf = ddf[(np.abs(ddf['asym'])<4) & (np.abs(ddf['ln']))<4]
         return df, ddf
 
     def get_waveforms(self, w0, w1, fit_func, note) -> None:
-        g = sns.lineplot(x=self.t, y=w0, color='green', label='CH0', **self.line_plot_style)
+        f, ax = plt.subplots(1,2, gridspec_kw={'width_ratios':[1,6]})
+        sns.lineplot(x=self.t, y=w0, color='green', label='CH0', **self.line_plot_style)
         sns.lineplot(x=self.t, y=w1, color='red', label='CH1', **self.line_plot_style)
         sns.lineplot(x=self.t, y=fit_func(t,*p0), color='green', **self.line_plot_style)
         sns.lineplot(x=self.t, y=fit_func(t,*p1), color='red', **self.line_plot_style)
-        g.annotate(note, size=10, xy={0,np.min(np.append(w0, w1)/2)} )
+        #g.annotate(note, size=10, xy={0,np.min(np.append(w0, w1)/2)} )
         #g.axvline(30, ls='--', lw=0.9, c='red')
         plt.show()
 
