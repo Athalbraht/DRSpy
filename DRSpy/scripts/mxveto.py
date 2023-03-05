@@ -37,7 +37,8 @@ class Analysis():
         # Check charts_path
         if charts_path:
             self.charts_path = Path(charts_path)
-            if not self.charts_path.exists(): self.charts_path.mkdir()
+            for folder in ['waveforms', 'time', 'signals', 'delay', 'stats']:
+                self.charts_path.joinpath(folder).mkdir(exist_ok=True, parents=True)
         else: self.charts_path = False
         # Check limit_file
         self.read_limit = len(DigitizerEventData.create_from_file(limit_file)[0]) if limit_file else 0
@@ -63,7 +64,7 @@ class Analysis():
         self.T_samples = len(evt[0][0].waveform)
         self.t = 0.2 * np.arange(0, self.T_samples)
         # Define graphs styling
-        self.chart_ext = 'pdf'
+        self.chart_ext = '.pdf'
         sns.set_theme()
         self.line_plot_style = {'ls':'-', 'lw':1}
         # ADD translator func
@@ -71,9 +72,9 @@ class Analysis():
         self.df_cols = ['event', 'timestamp', 'L', 'CH', 'A', 't_0', 't_r', 't_f', 'Q', 'dV', 'V_0']
         self.df_cols_sigma = ['sig_t_0', 'sig_t_r', 'sig_t_f', 'sig_Q', 'sig_dV', 'sig_V_0']
         self.ddf_cols = ['event', 't_0_ch0', 't_0_ch1', 'L', 'Q_ch0', 'Q_ch1', 'A_ch0', 'A_ch1', 'dt', 'lnQ', 'sqrtQ', 'asymQ', 'lnA', 'sqrtA', 'asymA']
-        self.df_cols_latex = ['evt_ID', 'timestamp [a.u.]', 'L [cm]', 'Channel_ID', 'Amplitude [V]', '$t_0$ [ns]', '$t_r$ [ns]', '$t_f$ [ns]', 'Charge', '$dV$ [V]', '$V_0$ [V]']
+        self.df_cols_latex = ['evt_ID', 'timestamp', 'L [cm]', 'Channel', 'Amp. [V]', '$t_0$ [ns]', '$t_r$ [ns]', '$t_f$ [ns]', 'Charge', '$dV$ [V]', '$V_0$ [V]']
         self.df_cols_sigma_latex = ['$\sigma t_0$', '$\sigma t_r', '$\sigma t_f$', '$\sigma Q$', '$\sigma dV$', '$\sigma V_0$']
-        self.ddf_cols_latex = ['evt_ID', '$t_0^{CH0}$ [ns]', 't_0^{CH1} [ns]', 'L [cm]', 'Q^{CH0}', 'Q^{CH1}', 'Amplitude CH0 [V]', 'Amplitude CH1 [V]', '$t_1^{CH1} - t_0^{CH0}$', '$`\ln{\\frac{Q_1}{Q_0}}$', '$\sqrt{Q_0Q_1}$', '$\\frac{Q_0-Q_1}{Q_1+Q_1}$', '$`\ln{\\frac{A_1}{A_0}}$', '$\sqrt{A_0A_1}$', '$\\frac{A_0-A_1}{A_1+A_1}$']
+        self.ddf_cols_latex = ['evt_ID', '$t_0^{CH0}$ [ns]', 't_0^{CH1} [ns]', 'L [cm]', 'Q^{CH0}', 'Q^{CH1}', 'Amp. CH0 [V]', 'Amp. CH1 [V]', '$t_1^{CH1} - t_0^{CH0}$', '$`\ln{\\frac{Q_1}{Q_0}}$', '$\sqrt{Q_0Q_1}$', '$\\frac{Q_0-Q_1}{Q_1+Q_1}$', '$`\ln{\\frac{A_1}{A_0}}$', '$\sqrt{A_0A_1}$', '$\\frac{A_0-A_1}{A_1+A_1}$']
         # change default df column names to LaTEX
         self.lx = dict(zip(self.df_cols+self.df_cols_sigma+self.ddf_cols, self.df_cols_latex+self.df_cols_sigma_latex+self.ddf_cols_latex))
 
@@ -94,7 +95,7 @@ class Analysis():
                          'history'  :   {},
                          'progress' :   {},}
             self.config_path.touch()
-            self.data['mxveto_version'] = __version__
+            self.toml.data['mxveto_version'] = __version__
             self.dump(self.config_path)
 
     def decode_filename(self, filename: str, separator: str='_', pos: int=1) -> float|bool:
@@ -147,7 +148,7 @@ class Analysis():
                     if plot_counter != 0:
                         plot_counter -= 1
                         plot_df = pd.DataFrame(dict(zip(self.df_cols_latex, [i[-2:] for i in p_list])))
-                        self.plot_waveforms(waveforms[0][nevt].waveform, waveforms[1][nevt].waveform, fit_func, f'', plot_df)
+                        self.plot_waveforms(waveforms[0][nevt].waveform, waveforms[1][nevt].waveform, fit_func, f'Waveform $L={source_position}$cm', plot_df)
         params_dict = dict(zip(self.df_cols+self.df_cols_sigma, p_list+q_list))
         return pd.DataFrame(params_dict)
 
@@ -195,19 +196,24 @@ class Analysis():
         return df, ddf
 
     def plot_waveforms(self, w0, w1, fit_func, note, df) -> None:
-        f, ax = plt.subplots(2,1)#, gridspec_kw={'width_ratios':[1,4]})
+        f, ax = plt.subplots(2,1, figsize=(10, 6), gridspec_kw={'height_ratios':[1,4]})
         sns.lineplot(x=self.t, y=w0, color='green', label='CH0', **self.line_plot_style, alpha=0.6, ax=ax[1])
         sns.lineplot(x=self.t, y=w1, color='red', label='CH1', **self.line_plot_style, alpha=0.6, ax=ax[1])
         sns.lineplot(x=self.t, y=fit_func(self.t,*df.iloc[0, range(len(self.df_cols)-len(self.df_cols_sigma), len(self.df_cols))]), color='green', **self.line_plot_style, alpha=0.6, ax=ax[1])
         sns.lineplot(x=self.t, y=fit_func(self.t,*df.iloc[1, range(len(self.df_cols)-len(self.df_cols_sigma), len(self.df_cols))]), color='red', **self.line_plot_style, alpha=0.6, ax=ax[1])
         ax[0].axis('off')
         ax[0].axis('tight')
+        ax[0].set_title(note)
         #ax[1].axis('tight')
-        ax[0].table(cellText=df.round(1).to_numpy(),colLabels=df.columns,loc='center')
+        table = ax[0].table(cellText=df.round(4).to_numpy(),colLabels=df.columns,loc='center')
+        table.auto_set_font_size(False)
+        table.set_fontsize(8)
+        table.scale(1, 1.2)
         #g.annotate(note, size=10, xy={0,np.min(np.append(w0, w1)/2)} )
         #g.axvline(30, ls='--', lw=0.9, c='red')
-        plt.title(note)
-        plt.show()
+        #plt.show()
+        filename = f'waveform_{df.iloc[0, 0]}'
+        f.savefig(self.charts_path.joinpath('waveforms').joinpath(filename).with_suffix(self.chart_ext))
 
 
     def plot_delay(self, fit_func):
@@ -397,6 +403,6 @@ def get_wf_params(root_filename):
 
 if __name__ == '__main__':
     print('Usage: python analysis.py <data_folder>')
-    run = Analysis(argv[1])
+    run = Analysis(argv[1], charts_path=argv[2])
     dff = run.load_waveforms(run.decode_filename, sig_fit)
 
