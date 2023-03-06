@@ -37,7 +37,7 @@ class Analysis():
         # Check charts_path
         if charts_path:
             self.charts_path = Path(charts_path)
-            for folder in ['waveforms', 'time', 'signals', 'delay', 'stats']:
+            for folder in ['waveforms', 'time', 'asymmetry', 'stats']:
                 self.charts_path.joinpath(folder).mkdir(exist_ok=True, parents=True)
         else: self.charts_path = False
         # Check limit_file
@@ -67,6 +67,8 @@ class Analysis():
         self.chart_ext = '.pdf'
         sns.set_theme()
         self.line_plot_style = {'ls':'-', 'lw':1}
+        self.fitline_plot_style = {'ls':'--', 'lw':1}
+        self.scatter_plot_style = {'s':4}
         # ADD translator func
         # Define DataFrame column names
         self.df_cols = ['event', 'timestamp', 'L', 'CH', 'A', 't_0', 't_r', 't_f', 'Q', 'dV', 'V_0']
@@ -74,7 +76,7 @@ class Analysis():
         self.ddf_cols = ['event', 't_0_ch0', 't_0_ch1', 'L', 'Q_ch0', 'Q_ch1', 'A_ch0', 'A_ch1', 'dt', 'lnQ', 'sqrtQ', 'asymQ', 'lnA', 'sqrtA', 'asymA']
         self.df_cols_latex = ['evt_ID', 'timestamp', 'L [cm]', 'Channel', 'Amp. [V]', '$t_0$ [ns]', '$t_r$ [ns]', '$t_f$ [ns]', 'Charge', '$dV$ [V]', '$V_0$ [V]']
         self.df_cols_sigma_latex = ['$\sigma t_0$', '$\sigma t_r', '$\sigma t_f$', '$\sigma Q$', '$\sigma dV$', '$\sigma V_0$']
-        self.ddf_cols_latex = ['evt_ID', '$t_0^{CH0}$ [ns]', 't_0^{CH1} [ns]', 'L [cm]', 'Q^{CH0}', 'Q^{CH1}', 'Amp. CH0 [V]', 'Amp. CH1 [V]', '$t_1^{CH1} - t_0^{CH0}$', '$`\ln{\\frac{Q_1}{Q_0}}$', '$\sqrt{Q_0Q_1}$', '$\\frac{Q_0-Q_1}{Q_1+Q_1}$', '$`\ln{\\frac{A_1}{A_0}}$', '$\sqrt{A_0A_1}$', '$\\frac{A_0-A_1}{A_1+A_1}$']
+        self.ddf_cols_latex = ['evt_ID', '$t_0^{CH0}$ [ns]', '$t_0^{CH1}$ [ns]', 'L [cm]', '$Q^{CH0}$', '$Q^{CH1}$', 'Amp. CH0 [V]', 'Amp. CH1 [V]', '$t_1^{CH1} - t_0^{CH0}$', '$\ln{\\frac{Q_1}{Q_0}}$', '$\sqrt{Q_0Q_1}$', '$\\frac{Q_0-Q_1}{Q_1+Q_1}$', '$\ln{\\frac{A_1}{A_0}}$', '$\sqrt{A_0A_1}$', '$\\frac{A_0-A_1}{A_1+A_1}$']
         # change default df column names to LaTEX
         self.lx = dict(zip(self.df_cols+self.df_cols_sigma+self.ddf_cols, self.df_cols_latex+self.df_cols_sigma_latex+self.ddf_cols_latex))
 
@@ -148,7 +150,10 @@ class Analysis():
                     if plot_counter != 0:
                         plot_counter -= 1
                         plot_df = pd.DataFrame(dict(zip(self.df_cols_latex, [i[-2:] for i in p_list])))
-                        self.plot_waveforms(waveforms[0][nevt].waveform, waveforms[1][nevt].waveform, fit_func, f'Waveform $L={source_position}$cm', plot_df)
+                        try:
+                            self.plot_waveforms(waveforms[0][nevt].waveform, waveforms[1][nevt].waveform, fit_func, f'Waveform $L={source_position}$cm', plot_df)
+                        except:
+                            pass
         params_dict = dict(zip(self.df_cols+self.df_cols_sigma, p_list+q_list))
         return pd.DataFrame(params_dict)
 
@@ -156,44 +161,43 @@ class Analysis():
         '''Filter raw DataFrame and extract only useful entries. The method generates filtered df with relative errors, groups by event and source position (ddf) and '''
         print('->\tCreating DataFrame')
         if isinstance(raw_df, str):
-            df = pd.read_csv(raw_df)
+            self.df = pd.read_csv(raw_df)
         else:
-            df = pd.DataFrame(raw_df)
+            self.df = pd.DataFrame(raw_df)
         dcol = ['event','t_0', 'L', 'Q', 'A']
         print('->\tClearing nan and inf values')
-        df.replace([np.inf,-np.inf], np.nan, inplace=True)
-        df.dropna(inplace=True)
-        df.reset_index(inplace=True, drop=True)
+        self.df.replace([np.inf,-np.inf], np.nan, inplace=True)
+        self.df.dropna(inplace=True)
+        self.df.reset_index(inplace=True, drop=True)
         
         print('->\tCalculating rel error')
         tmp = [[] for i in range(len(self.df_cols_sigma)-1)]
-        with click.progressbar(range(len(df))) as bar:
+        with click.progressbar(range(len(self.df))) as bar:
             for i in bar:
                 for j in range(len(tmp)):
-                    diff = round(df.loc[i,df.columns[len(self.df_cols)+1+j]]/df.loc[i,df.columns[(len(self.df_cols)-len(self.df_cols_sigma)+1)+j]],4)
+                    diff = round(self.df.loc[i,self.df.columns[len(self.df_cols)+1+j]]/self.df.loc[i,self.df.columns[(len(self.df_cols)-len(self.df_cols_sigma)+1)+j]],4)
                     if np.abs(diff) > 1 or diff == np.nan or np.abs(diff) == np.inf:
                         tmp[j].append(1)
                     else:
                         tmp[j].append(diff)
-        tmp = dict(zip('rel_'+df.columns[(len(self.df_cols)-len(self.df_cols_sigma)+1):(len(self.df_cols)+1)], tmp))
+        tmp = dict(zip('rel_'+self.df.columns[(len(self.df_cols)-len(self.df_cols_sigma)+1):(len(self.df_cols)+1)], tmp))
         for i in tmp.keys():
-            df[i] = tmp[i]
+            self.df[i] = tmp[i]
 
         print('->\tFiltering df data...')
-        df = df[(df['t_r'] > 0) & (df['t_f'] > 0) & (df['t_r'] < 10) & (df['t_f'] < 10) & (df['t_0'] >20) & (df['t_0'] < 80) & (df['Q'] <= 0) & (df['Q'] > -5)]
+        self.df = self.df[(self.df['t_r'] > 0) & (self.df['t_f'] > 0) & (self.df['t_r'] < 10) & (self.df['t_f'] < 10) & (self.df['t_0'] >20) & (self.df['t_0'] < 80) & (self.df['Q'] <= 0) & (self.df['Q'] > -5)]
 
         print('->\tCalculating asymeties')
-        ddf = df[df['CH']==0][dcol].merge(df[df['CH']==1][dcol], how='inner', on=['event', 'L'], suffixes=['_ch0','_ch1'])
-        ddf[self.ddf_cols[8]] = ddf.apply(lambda x: x.t_0_ch1-x.t_0_ch0, axis=1)
-        ddf[self.ddf_cols[9]] = ddf.apply(lambda x: np.log(x.Q_ch1/x.Q_ch0), axis=1)
-        ddf[self.ddf_cols[10]] = ddf.apply(lambda x: np.sqrt(x.Q_ch1*x.Q_ch0), axis=1)
-        ddf[self.ddf_cols[11]] = ddf.apply(lambda x: (x.Q_ch0-x.Q_ch1)/(x.Q_ch0+x.Q_ch1), axis=1)
-        ddf[self.ddf_cols[12]] = ddf.apply(lambda x: np.log(x.A_ch1/x.A_ch0), axis=1)
-        ddf[self.ddf_cols[13]] = ddf.apply(lambda x: np.sqrt(x.A_ch1*x.A_ch0), axis=1)
-        ddf[self.ddf_cols[14]] = ddf.apply(lambda x: (x.A_ch0-x.A_ch1)/(x.A_ch0+x.A_ch1), axis=1)
+        self.ddf = self.df[self.df['CH']==0][dcol].merge(self.df[self.df['CH']==1][dcol], how='inner', on=['event', 'L'], suffixes=['_ch0','_ch1'])
+        self.ddf[self.ddf_cols[8]] = self.ddf.apply(lambda x: x.t_0_ch1-x.t_0_ch0, axis=1)
+        self.ddf[self.ddf_cols[9]] = self.ddf.apply(lambda x: np.log(x.Q_ch1/x.Q_ch0), axis=1)
+        self.ddf[self.ddf_cols[10]] = self.ddf.apply(lambda x: np.sqrt(x.Q_ch1*x.Q_ch0), axis=1)
+        self.ddf[self.ddf_cols[11]] = self.ddf.apply(lambda x: (x.Q_ch0-x.Q_ch1)/(x.Q_ch0+x.Q_ch1), axis=1)
+        self.ddf[self.ddf_cols[12]] = self.ddf.apply(lambda x: np.log(x.A_ch1/x.A_ch0), axis=1)
+        self.ddf[self.ddf_cols[13]] = self.ddf.apply(lambda x: np.sqrt(x.A_ch1*x.A_ch0), axis=1)
+        self.ddf[self.ddf_cols[14]] = self.ddf.apply(lambda x: (x.A_ch0-x.A_ch1)/(x.A_ch0+x.A_ch1), axis=1)
         print('->\tFiltering ddf data...')
-        ddf = ddf[(np.abs(ddf['asym'])<4) & (np.abs(ddf['ln']))<4]
-        return df, ddf
+        self.ddf = self.ddf[(np.abs(self.ddf['asymQ'])<4) & (np.abs(self.ddf['lnQ']))<4]
 
     def plot_waveforms(self, w0, w1, fit_func, note, df) -> None:
         f, ax = plt.subplots(2,1, figsize=(10, 6), gridspec_kw={'height_ratios':[1,4]})
@@ -216,66 +220,55 @@ class Analysis():
         f.savefig(self.charts_path.joinpath('waveforms').joinpath(filename).with_suffix(self.chart_ext))
 
 
-    def plot_delay(self, fit_func):
+    def plot_lin(self, fit_func, y='dt', fit_param='c', folder='asymmetry', lim=(-20, 20)):
         df = self.ddf.groupby('L').mean().reset_index()
-        p, q = curve_fit(fit_func, df['L'], df['dt'])
-        c = round(-2/p[0],2)
-        print('f->\tFound {c=} +- cm/ns')
-        sns.lineplot(data=self.df, x='L', y='dt', **self.line_plot_style)
-        sns.lineplot(x=df['L'], y=fit_func(df['L'], *p), **self.line_plot_style, ls='--', color='black')
-        plt.show()
-        sns.histplot(data=self.df, x='L', y='dt', cbar=True)
-        sns.lineplot(x=df['L'], y=fit_func(df['L'], *p), **self.line_plot_style, ls='--', color='black')
-        plt.ylim(-20,20)
-        plt.show()
+        p, q = curve_fit(fit_func, df['L'], df[y])
+        c = round(-2/p[0], 3)
+        err = round(np.abs(np.sqrt(q[0][0])/p[0]), 3)
+        print(f'->\tFound {fit_param}={c} +- {err}')
+        sns.scatterplot(data=df.rename(columns=self.lx), x=self.lx['L'], y=self.lx[y], **self.scatter_plot_style)
+        sns.lineplot(x=df['L'], y=fit_func(df['L'], *p), **self.fitline_plot_style, color='black')
+        filename = f'fit_{y}'
+        plt.savefig(self.charts_path.joinpath(folder).joinpath(filename).with_suffix(self.chart_ext))
+        plt.clf()
+        sns.histplot(data=self.ddf.rename(columns=self.lx), x=self.lx['L'], y=self.lx[y], cbar=True)
+        sns.lineplot(x=df['L'], y=fit_func(df['L'], *p), **self.fitline_plot_style, color='black')
+        plt.ylim(lim[0], lim[1])
+        filename = f'fit_{y}_hist'
+        plt.savefig(self.charts_path.joinpath(folder).joinpath(filename).with_suffix(self.chart_ext))
+        plt.clf()
+
+    def plot_asym(self, y, color, folder='asymmetry'):
+        if len(y)>1:
+            for i, yy in enumerate(y):
+                sns.lineplot(data=self.ddf.rename(columns=self.lx), x=self.lx['L'], y=self.lx[yy], **self.line_plot_style, color=color[i])
+        else:
+            sns.lineplot(data=self.ddf.rename(columns=self.lx), x=self.lx['L'], y=self.lx[y[0]], **self.line_plot_style, color=color[0])
+        filename = f'asym_{y}'
+        plt.savefig(self.charts_path.joinpath(folder).joinpath(filename).with_suffix(self.chart_ext))
+        plt.clf()
 
     def plot_signal(self, fit_func):
-        df = self.ddf.groupby('L').mean().reset_index()
-        p, q = curve_fit(fit_func, df['L'], df['lnQ'])
-        lm = round(2/p[0],2)
-        print('f->\tFound (Q) {lm=} +- cm')
-        sns.lineplot(data=self.df, x='L', y='lnQ', **self.line_plot_style)
-        sns.lineplot(x=df['L'], y=fit_func(df['L'], *p), **self.line_plot_style, ls='--', color='black')
-        plt.show()
-        sns.histplot(data=self.df, x='L', y='lnQ', cbar=True)
-        sns.lineplot(x=df['L'], y=fit_func(df['L'], *p), **self.line_plot_style, ls='--', color='black')
-        plt.ylim(-4,4)
-        plt.show()
+        self.plot_lin(fit_func, 'lnQ', 'Qlambda', lim=(-4, 4))
+        self.plot_lin(fit_func, 'lnA', 'Alambda', lim=(-4, 4))
 
-        p, q = curve_fit(fit_func, df['L'], df['lnA'])
-        lm = round(2/p[0],2)
-        print('f->\tFound (A) {lm=} +- cm')
-        sns.lineplot(data=self.df, x='L', y='lnA', **self.line_plot_style)
-        sns.lineplot(x=df['L'], y=fit_func(df['L'], *p), **self.line_plot_style, ls='--', color='black')
-        plt.show()
-        sns.histplot(data=self.df, x='L', y='lnA', cbar=True)
-        sns.lineplot(x=df['L'], y=fit_func(df['L'], *p), **self.line_plot_style, ls='--', color='black')
-        plt.ylim(-4,4)
-        plt.show()
+        y = [['sqrtQ'], ['asymQ'], ['sqrtA'], ['asymA'], ['Q_ch0', 'Q_ch1'], ['A_ch0', 'A_ch1']]
+        colors = ['black', 'red']
+        for yy in y:
+            self.plot_asym(yy, colors)
 
-        sns.lineplot(data=self.df, x='L', y='sqrtQ', **self.line_plot_style, color='black')
-        plt.show()
-        sns.lineplot(data=self.df, x='L', y='asymQ', **self.line_plot_style, color='black')
-        plt.show()
-        sns.lineplot(data=self.df, x='L', y='sqrtA', **self.line_plot_style, color='black')
-        plt.show()
-        sns.lineplot(data=self.df, x='L', y='asymA', **self.line_plot_style, color='black')
-        plt.show()
-        sns.lineplot(data=self.df, x='L', y='Q_ch0', **self.line_plot_style, color='red')
-        sns.lineplot(data=self.df, x='L', y='Q_ch1', **self.line_plot_style, color='blue')
-        plt.show()
-        sns.lineplot(data=self.df, x='L', y='A_ch0', **self.line_plot_style, color='red')
-        sns.lineplot(data=self.df, x='L', y='A_ch1', **self.line_plot_style, color='blue')
-        plt.show()
-
-    def plot_time(self):
-        sns.jointplot(data=self.ddf, x='t_0_ch0', y='t_0_ch1',kind='hist')
-        plt.show()
-        sns.jointplot(data=ddf,x='dt', y='ln',kind='hist')
-        plt.show()
-        sns.jointplot(data=ddf,x='t_r', y='t_f',kind='hist')
-        plt.show()
-
+    def plot_joint(self):
+        xy = [('t_0_ch0', 't_0_ch1'),
+              ('dt', 'lnQ')]
+        sns.jointplot(data=self.ddf.rename(columns=self.lx), x=self.lx['t_r'], y=self.lx['t_f'],kind='hist')
+        filename = f'joint_t_r-t_f'
+        plt.savefig(self.charts_path.joinpath('time').joinpath(filename).with_suffix(self.chart_ext))
+        plt.clf()
+        for plot in xy:
+            sns.jointplot(data=self.ddf.rename(columns=self.lx), x=self.lx[plot[0]], y=self.lx[plot[1]],kind='hist')
+            filename = f'joint_{plot[0]}-{plot[1]}'
+            plt.savefig(self.charts_path.joinpath('time').joinpath(filename).with_suffix(self.chart_ext))
+            plt.clf()
 
     def get_waveform_fit(self, fit_func: Callable[Any, float], waveform: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         get_t0 = lambda t_m, t_r, t_f: t_m - t_r * t_f / (t_f - t_r) * np.log(t_f/t_r)
@@ -403,6 +396,10 @@ def get_wf_params(root_filename):
 
 if __name__ == '__main__':
     print('Usage: python analysis.py <data_folder>')
-    run = Analysis(argv[1], charts_path=argv[2])
+    run = Analysis(argv[1], charts_path=argv[2], limit_file=argv[3])
     dff = run.load_waveforms(run.decode_filename, sig_fit)
+    run.prepare(dff)
+    run.plot_lin(lin_fit)
+    run.plot_signal(lin_fit)
+    run.plot_joint()
 
