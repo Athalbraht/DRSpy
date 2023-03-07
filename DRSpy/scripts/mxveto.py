@@ -68,7 +68,7 @@ class Analysis():
         sns.set_theme()
         self.line_plot_style = {'ls':'-', 'lw':1}
         self.fitline_plot_style = {'ls':'--', 'lw':1}
-        self.scatter_plot_style = {'s':4}
+        self.scatter_plot_style = {'s':10}
         # ADD translator func
         # Define DataFrame column names
         self.df_cols = ['event', 'timestamp', 'L', 'CH', 'A', 't_0', 't_r', 't_f', 'Q', 'dV', 'V_0']
@@ -153,7 +153,8 @@ class Analysis():
                         try:
                             self.plot_waveforms(waveforms[0][nevt].waveform, waveforms[1][nevt].waveform, fit_func, f'Waveform $L={source_position}$cm', plot_df)
                         except:
-                            pass
+                            plt.clf()
+                            plt.cla()
         params_dict = dict(zip(self.df_cols+self.df_cols_sigma, p_list+q_list))
         return pd.DataFrame(params_dict)
 
@@ -187,7 +188,7 @@ class Analysis():
         print('->\tFiltering df data...')
         self.df = self.df[(self.df['t_r'] > 0) & (self.df['t_f'] > 0) & (self.df['t_r'] < 10) & (self.df['t_f'] < 10) & (self.df['t_0'] >20) & (self.df['t_0'] < 80) & (self.df['Q'] <= 0) & (self.df['Q'] > -5)]
 
-        print('->\tCalculating asymeties')
+        print('->\tCalculating asymmeties')
         self.ddf = self.df[self.df['CH']==0][dcol].merge(self.df[self.df['CH']==1][dcol], how='inner', on=['event', 'L'], suffixes=['_ch0','_ch1'])
         self.ddf[self.ddf_cols[8]] = self.ddf.apply(lambda x: x.t_0_ch1-x.t_0_ch0, axis=1)
         self.ddf[self.ddf_cols[9]] = self.ddf.apply(lambda x: np.log(x.Q_ch1/x.Q_ch0), axis=1)
@@ -218,6 +219,7 @@ class Analysis():
         #plt.show()
         filename = f'waveform_{df.iloc[0, 0]}'
         f.savefig(self.charts_path.joinpath('waveforms').joinpath(filename).with_suffix(self.chart_ext))
+        plt.clf()
 
 
     def plot_lin(self, fit_func, y='dt', fit_param='c', folder='asymmetry', lim=(-20, 20)):
