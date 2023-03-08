@@ -262,7 +262,7 @@ class Analysis():
     def plot_joint(self):
         xy = [('t_0_ch0', 't_0_ch1'),
               ('dt', 'lnQ')]
-        sns.jointplot(data=self.ddf.rename(columns=self.lx), x=self.lx['t_r'], y=self.lx['t_f'],kind='hist')
+        sns.jointplot(data=self.df.rename(columns=self.lx), x=self.lx['t_r'], y=self.lx['t_f'],kind='hist')
         filename = f'joint_t_r-t_f'
         plt.savefig(self.charts_path.joinpath('time').joinpath(filename).with_suffix(self.chart_ext))
         plt.clf()
