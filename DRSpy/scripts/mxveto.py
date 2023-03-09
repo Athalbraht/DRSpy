@@ -188,6 +188,11 @@ class Analysis():
         print('->\tFiltering df data...')
         self.df = self.df[(self.df['t_r'] > 0) & (self.df['t_f'] > 0) & (self.df['t_r'] < 10) & (self.df['t_f'] < 10) & (self.df['t_0'] >20) & (self.df['t_0'] < 80) & (self.df['Q'] <= 0) & (self.df['Q'] > -5)]
 
+        print('->\t Calculating mean values... (ddf)')
+        self.dddf = DataFrame()
+        self.dddf_cols = ['CH', 'L', 'wg_t_0', 'hist_t_0', 'wg_t_r', 'hist_r_r', 'wg_f_f', 'hist_t_f', 'wg_Q', 'hist_Q',
+                          'sig_CH', 'sig_L', 'sig_wg_t_0', 'sig_hist_t_0', 'sig_wg_t_r', 'sig_hist_r_r', 'sig_wg_f_f', 'sig_hist_t_f', 'sig_wg_Q', 'sig_hist_Q',] 
+
         print('->\tCalculating asymmeties')
         self.ddf = self.df[self.df['CH']==0][dcol].merge(self.df[self.df['CH']==1][dcol], how='inner', on=['event', 'L'], suffixes=['_ch0','_ch1'])
         self.ddf[self.ddf_cols[8]] = self.ddf.apply(lambda x: x.t_0_ch1-x.t_0_ch0, axis=1)
