@@ -188,10 +188,6 @@ class Analysis():
         print('->\tFiltering df data...')
         self.df = self.df[(self.df['t_r'] > 0) & (self.df['t_f'] > 0) & (self.df['t_r'] < 10) & (self.df['t_f'] < 10) & (self.df['t_0'] >20) & (self.df['t_0'] < 80) & (self.df['Q'] <= 0) & (self.df['Q'] > -5)]
 
-        print('->\t Calculating mean values... (ddf)')
-        self.dddf = DataFrame()
-        self.dddf_cols = ['CH', 'L', 'wg_t_0', 'hist_t_0', 'wg_t_r', 'hist_r_r', 'wg_f_f', 'hist_t_f', 'wg_Q', 'hist_Q',
-                          'sig_CH', 'sig_L', 'sig_wg_t_0', 'sig_hist_t_0', 'sig_wg_t_r', 'sig_hist_r_r', 'sig_wg_f_f', 'sig_hist_t_f', 'sig_wg_Q', 'sig_hist_Q',] 
 
         print('->\tCalculating asymmeties')
         self.ddf = self.df[self.df['CH']==0][dcol].merge(self.df[self.df['CH']==1][dcol], how='inner', on=['event', 'L'], suffixes=['_ch0','_ch1'])
@@ -204,6 +200,46 @@ class Analysis():
         self.ddf[self.ddf_cols[14]] = self.ddf.apply(lambda x: (x.A_ch0-x.A_ch1)/(x.A_ch0+x.A_ch1), axis=1)
         print('->\tFiltering ddf data...')
         self.ddf = self.ddf[(np.abs(self.ddf['asymQ'])<4) & (np.abs(self.ddf['lnQ']))<4]
+
+
+        print('->\t Calculating mean values... (ddf)')
+        self.dddf = DataFrame()
+        self.dddf_cols = ['CH', 'L', 'wg_t_0', 'hist_t_0', 'wg_t_r', 'hist_r_r', 'wg_f_f', 'hist_t_f', 'wg_Q', 'hist_Q',
+                          'sig_CH', 'sig_L', 'sig_wg_t_0', 'sig_hist_t_0', 'sig_wg_t_r', 'sig_hist_r_r', 'sig_wg_f_f', 'sig_hist_t_f', 'sig_wg_Q', 'sig_hist_Q',] 
+        cols = ['t_0', 't_r', 't_f', 'Q', 'A']
+        hist_fit_func = [gauss_fit for i in range(3)] + [landau_fit, landau_fit]
+        cols2 = ['dt', 'ln', 'sqrt', 'asym']
+        wg_cols = ['wg_'+i for i in cols+cols2]
+        hist_cols = ['hist_'+i for i in cols+cols2]
+        sig_cols = ['sig_'+i for i in wg_dict+hist_cols]
+        columns = ['L']+wg_cols+hist_cols+sig_cols
+        df_dict = dict(zip(columns, [[] for i in range(columns)]))
+        with click.progressbar(set(df['L']), label='Creating ddf DataFrame') as bar:
+            for pos in bar:
+                _ddf = self.ddf[(self.ddf['L']==pos)]
+                df_dict['L'].append(pos)
+                for nch, channel in enumerate([f'_ch{i}' for i in range(self.channels)]):
+                    _df = self.df[(self.df['L']==pos) & (self.df['CH']==nch)]
+                    for nc, col in enumerate(cols):
+                        ha, hb = np.histogram(_df[col], self.hist_density)
+                        df_dict['wg_'+col+f'_ch{nch}'].append(np.average(hb[:-1], weight=ha))
+                        df_dict['sig_wg_'+col+f'_ch{nch}'].].append(0.1)
+
+                        p, q = curve_fit(hist_fit_func[nc], hb[:-1], hb)
+                        df_dict['hist_'+col+f'_ch{nch}'].].append(p[0])
+                        df_dict['sig_hist_'+col+f'_ch{nch}'].].append(np.sqrt(np.diag(q))[0])
+                for m in ['wg', 'hist']:
+                    df_dict[f'{m}_dt'].append(df_dict[f'{m}_t_0_ch1'][-1] - df_dict[f'{m}_t_0_ch0'][-1])
+                    df_dict[f'sig_{m}_dt'].append(np.sqrt(df_dict[f'sig_{m}_t_0_ch1'][-1]**2 + df_dict[f'sig_{m}_t_0_ch0'][-1]**2))
+
+                    df_dict[f'{m}_ln'].append(np.log((df_dict[f'{m}_Q_ch1'][-1])/(df_dict[f'{m}_Q_ch1'][-1])))
+                    df_dict[f'sig_{m}_ln'].append(np.sqrt((df_dict[f'sig_{m}_Q_ch1'][-1]/df_dict[f'{m}_Q_ch1'][-1])**2 + (df_dict[f'sig_{m}_Q_ch0'][-1]/df_dict[f'{m}_Q_ch0'][-1])**2))
+
+                    df_dict[f'{m}_asym'].append((f'{m}_Q_ch0'][-1]-f'{m}_Q_ch1'][-1])/(f'{m}_Q_ch0'][-1]+f'{m}_Q_ch1'][-1]))
+                    df_dict[f'sig_{m}_asym'].append(np.sqrt((2*f'sig_{m}_Q_ch0'][-1]*f'{m}_Q_ch1'][-1]/(f'{m}_Q_ch1'][-1]+f'{m}_Q_ch0'][-1])**2)**2 + (2*f'sig_{m}_Q_ch1'][-1]*f'{m}_Q_ch0'][-1]/(f'{m}_Q_ch1'][-1]+f'{m}_Q_ch0'][-1])**2)**2))
+
+                    df_dict[f'{m}_sqrt'].append(np.sqrt(f'{m}_Q_ch0'][-1]*f'{m}_Q_ch1'][-1]))
+                    df_dict[f'sig_{m}_sqrt'].append(np.sqrt((f'sig_{m}_Q_ch0'][-1]*f'{m}_Q_ch1'][-1]/(2*np.sqrt(f'{m}_Q_ch0'][-1]*f'{m}_Q_ch1'][-1])))**2 + (f'sig_{m}_Q_ch1'][-1]*f'{m}_Q_ch0'][-1]/(2*np.sqrt(f'{m}_Q_ch0'][-1]*f'{m}_Q_ch1'][-1])))**2))
 
     def plot_waveforms(self, w0, w1, fit_func, note, df) -> None:
         f, ax = plt.subplots(2,1, figsize=(10, 6), gridspec_kw={'height_ratios':[1,4]})
@@ -294,7 +330,10 @@ class Analysis():
         except: 
             return np.full((len(p0)), np.inf), np.full((len(p0),len(p0)), np.inf)
 
-def asymgauss_fit(x, m0, m1, m2):
+def gauss_fit(x,x0,a,sigma):
+    return a*exp(-(x-x0)**2/(2*sigma**2))
+
+def asymgauss_fit(x, m1, m0, m2, m3):
     amp = (m0 / (m2 * np.sqrt(2 * np.pi)))
     spread = np.exp((-(x - m1)**2 ) / (2 * m2**2))
     skew = (1 + erf((m3 * (x - m1)) / (m2 * np.sqrt(2))))
