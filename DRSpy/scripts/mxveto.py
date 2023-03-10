@@ -202,18 +202,16 @@ class Analysis():
         print('->\tFiltering ddf data...')
         self.ddf = self.ddf[(np.abs(self.ddf['asymQ'])<4) & (np.abs(self.ddf['lnQ']))<4]
 
-    col = ['t_0', 't_r', 't_f', 'Q', 'A', 'V_0', 'dV']
-    hcol = [ 't_r', 't_f', 'Q', 'A', 'V_0', 'dV']
-    tt = [[] for i in range(len(col))]
-    dh = 200
+        col = ['t_0', 't_r', 't_f', 'Q', 'A', 'V_0', 'dV']
+        hcol = [ 't_r', 't_f', 'Q', 'A', 'V_0', 'dV']
+        tt = [[] for i in range(len(col))]
+        dh = 200
 
 
-    for i in range(len(col)):
-         a, b = ax(col[i])
-         tt[i].append(a)
-         tt[i].append(b)
-
-
+        for i in range(len(col)):
+             a, b = ax(col[i])
+             tt[i].append(a)
+             tt[i].append(b)
 
         '''
         print('->\t Calculating mean values... (ddf)')
@@ -352,7 +350,7 @@ class Analysis():
         except: 
             return np.full((len(p0)), np.inf), np.full((len(p0), len(p0)), np.inf)
 
-    def get_hist_avg(self, df, key, ext='pdf', tp='hist', fit_func, tries=20, dh=200, max_err=1e-3):
+    def get_hist_avg(self, df, key, fit_func, ext='pdf', tp='hist', tries=20, dh=200, max_err=1e-3):
             t = [[], [], [], []]
             color = ['red', 'blue']
             for l in L:
