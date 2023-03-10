@@ -92,11 +92,11 @@ class Analysis():
             self.data = toml.load(self.config_path)
         else:
             print('\t->File not found. Initialization...')
-            self.data = {'metadata' :   {},
-                         'filters'  :   {},
-                         'style'    :   {},
-                         'history'  :   {},
-                         'progress' :   {},}
+            self.data = {'metadata' :   {}, 
+                         'filters'  :   {}, 
+                         'style'    :   {}, 
+                         'history'  :   {}, 
+                         'progress' :   {}, }
             self.config_path.touch()
             self.toml.data['mxveto_version'] = __version__
             self.dump(self.config_path)
@@ -131,7 +131,7 @@ class Analysis():
                 continue
             waveforms = DigitizerEventData.create_from_file(filename)
             plot_counter = 10
-            with click.progressbar(range(len(waveforms[0][:wf_num])),label=f'Analyzing waveforms {nfile}/{len(self.files)} ({source_position}cm)\t') as wbar:
+            with click.progressbar(range(len(waveforms[0][:wf_num])), label=f'Analyzing waveforms {nfile}/{len(self.files)} ({source_position}cm)\t') as wbar:
                 for nevt in wbar:
                     if self.read_limit and nevt > self.read_limit:
                         print('\n\t->\tFile is to big. SKIP')
@@ -144,7 +144,7 @@ class Analysis():
                         p_list[2].append(source_position)
                         p_list[3].append(channel)
                         p_list[4].append(waveforms[channel][nevt].amplitude)
-                        p,q = self.get_waveform_fit(fit_func, waveforms[channel][nevt].waveform) 
+                        p, q = self.get_waveform_fit(fit_func, waveforms[channel][nevt].waveform) 
                         for i in range(len(p)):
                             p_list[i+len(self.df_cols)-len(self.df_cols_sigma)].append(p[i])
                             q_list[i].append(np.sqrt(np.diag(q))[i])
@@ -166,9 +166,9 @@ class Analysis():
             self.df = pd.read_csv(raw_df)
         else:
             self.df = pd.DataFrame(raw_df)
-        dcol = ['event','t_0', 'L', 'Q', 'A']
+        dcol = ['event', 't_0', 'L', 'Q', 'A']
         print('->\tClearing nan and inf values')
-        self.df.replace([np.inf,-np.inf], np.nan, inplace=True)
+        self.df.replace([np.inf, -np.inf], np.nan, inplace=True)
         self.df.dropna(inplace=True)
         self.df.reset_index(inplace=True, drop=True)
         
@@ -177,7 +177,7 @@ class Analysis():
         with click.progressbar(range(len(self.df))) as bar:
             for i in bar:
                 for j in range(len(tmp)):
-                    diff = round(self.df.loc[i,self.df.columns[len(self.df_cols)+1+j]]/self.df.loc[i,self.df.columns[(len(self.df_cols)-len(self.df_cols_sigma)+1)+j]],4)
+                    diff = round(self.df.loc[i, self.df.columns[len(self.df_cols)+1+j]]/self.df.loc[i, self.df.columns[(len(self.df_cols)-len(self.df_cols_sigma)+1)+j]], 4)
                     if np.abs(diff) > 1 or diff == np.nan or np.abs(diff) == np.inf:
                         tmp[j].append(1)
                     else:
@@ -191,7 +191,7 @@ class Analysis():
 
 
         print('->\tCalculating asymmeties')
-        self.ddf = self.df[self.df['CH']==0][dcol].merge(self.df[self.df['CH']==1][dcol], how='inner', on=['event', 'L'], suffixes=['_ch0','_ch1'])
+        self.ddf = self.df[self.df['CH']==0][dcol].merge(self.df[self.df['CH']==1][dcol], how='inner', on=['event', 'L'], suffixes=['_ch0', '_ch1'])
         self.ddf[self.ddf_cols[8]] = self.ddf.apply(lambda x: x.t_0_ch1-x.t_0_ch0, axis=1)
         self.ddf[self.ddf_cols[9]] = self.ddf.apply(lambda x: np.log(x.Q_ch1/x.Q_ch0), axis=1)
         self.ddf[self.ddf_cols[10]] = self.ddf.apply(lambda x: np.sqrt(x.Q_ch1*x.Q_ch0), axis=1)
@@ -202,10 +202,23 @@ class Analysis():
         print('->\tFiltering ddf data...')
         self.ddf = self.ddf[(np.abs(self.ddf['asymQ'])<4) & (np.abs(self.ddf['lnQ']))<4]
 
+    col = ['t_0', 't_r', 't_f', 'Q', 'A', 'V_0', 'dV']
+    hcol = [ 't_r', 't_f', 'Q', 'A', 'V_0', 'dV']
+    tt = [[] for i in range(len(col))]
+    dh = 200
+
+
+    for i in range(len(col)):
+         a, b = ax(col[i])
+         tt[i].append(a)
+         tt[i].append(b)
+
+
+
         '''
         print('->\t Calculating mean values... (ddf)')
-        self.dddf_cols = ['CH', 'L', 'wg_t_0', 'hist_t_0', 'wg_t_r', 'hist_r_r', 'wg_f_f', 'hist_t_f', 'wg_Q', 'hist_Q',
-                          'sig_CH', 'sig_L', 'sig_wg_t_0', 'sig_hist_t_0', 'sig_wg_t_r', 'sig_hist_r_r', 'sig_wg_f_f', 'sig_hist_t_f', 'sig_wg_Q', 'sig_hist_Q',] 
+        self.dddf_cols = ['CH', 'L', 'wg_t_0', 'hist_t_0', 'wg_t_r', 'hist_r_r', 'wg_f_f', 'hist_t_f', 'wg_Q', 'hist_Q', 
+                          'sig_CH', 'sig_L', 'sig_wg_t_0', 'sig_hist_t_0', 'sig_wg_t_r', 'sig_hist_r_r', 'sig_wg_f_f', 'sig_hist_t_f', 'sig_wg_Q', 'sig_hist_Q', ] 
         cols = ['t_0', 't_r', 't_f', 'Q', 'A']
         hist_fit_func = [gauss_fit for i in range(3)] + [landau_fit, landau_fit]
         cols2 = ['dt', 'ln', 'sqrt', 'asym']
@@ -251,20 +264,20 @@ class Analysis():
         self.dddf = pd.DataFrame(df_dict)
         '''
     def plot_waveforms(self, w0, w1, fit_func, note, df) -> None:
-        f, ax = plt.subplots(2,1, figsize=(10, 6), gridspec_kw={'height_ratios':[1,4]})
+        f, ax = plt.subplots(2, 1, figsize=(10, 6), gridspec_kw={'height_ratios':[1, 4]})
         sns.lineplot(x=self.t, y=w0, color='green', label='CH0', **self.line_plot_style, alpha=0.6, ax=ax[1])
         sns.lineplot(x=self.t, y=w1, color='red', label='CH1', **self.line_plot_style, alpha=0.6, ax=ax[1])
-        sns.lineplot(x=self.t, y=fit_func(self.t,*df.iloc[0, range(len(self.df_cols)-len(self.df_cols_sigma), len(self.df_cols))]), color='green', **self.line_plot_style, alpha=0.6, ax=ax[1])
-        sns.lineplot(x=self.t, y=fit_func(self.t,*df.iloc[1, range(len(self.df_cols)-len(self.df_cols_sigma), len(self.df_cols))]), color='red', **self.line_plot_style, alpha=0.6, ax=ax[1])
+        sns.lineplot(x=self.t, y=fit_func(self.t, *df.iloc[0, range(len(self.df_cols)-len(self.df_cols_sigma), len(self.df_cols))]), color='green', **self.line_plot_style, alpha=0.6, ax=ax[1])
+        sns.lineplot(x=self.t, y=fit_func(self.t, *df.iloc[1, range(len(self.df_cols)-len(self.df_cols_sigma), len(self.df_cols))]), color='red', **self.line_plot_style, alpha=0.6, ax=ax[1])
         ax[0].axis('off')
         ax[0].axis('tight')
         ax[0].set_title(note)
         #ax[1].axis('tight')
-        table = ax[0].table(cellText=df.round(4).to_numpy(),colLabels=df.columns,loc='center')
+        table = ax[0].table(cellText=df.round(4).to_numpy(), colLabels=df.columns, loc='center')
         table.auto_set_font_size(False)
         table.set_fontsize(8)
         table.scale(1, 1.2)
-        #g.annotate(note, size=10, xy={0,np.min(np.append(w0, w1)/2)} )
+        #g.annotate(note, size=10, xy={0, np.min(np.append(w0, w1)/2)} )
         #g.axvline(30, ls='--', lw=0.9, c='red')
         #plt.show()
         filename = f'waveform_{df.iloc[0, 0]}'
@@ -310,14 +323,14 @@ class Analysis():
             self.plot_asym(yy, colors)
 
     def plot_joint(self):
-        xy = [('t_0_ch0', 't_0_ch1'),
+        xy = [('t_0_ch0', 't_0_ch1'), 
               ('dt', 'lnQ')]
-        sns.jointplot(data=self.df.rename(columns=self.lx), x=self.lx['t_r'], y=self.lx['t_f'],kind='hist')
+        sns.jointplot(data=self.df.rename(columns=self.lx), x=self.lx['t_r'], y=self.lx['t_f'], kind='hist')
         filename = f'joint_t_r-t_f'
         plt.savefig(self.charts_path.joinpath('time').joinpath(filename).with_suffix(self.chart_ext))
         plt.clf()
         for plot in xy:
-            sns.jointplot(data=self.ddf.rename(columns=self.lx), x=self.lx[plot[0]], y=self.lx[plot[1]],kind='hist')
+            sns.jointplot(data=self.ddf.rename(columns=self.lx), x=self.lx[plot[0]], y=self.lx[plot[1]], kind='hist')
             filename = f'joint_{plot[0]}-{plot[1]}'
             plt.savefig(self.charts_path.joinpath('time').joinpath(filename).with_suffix(self.chart_ext))
             plt.clf()
@@ -334,12 +347,86 @@ class Analysis():
 
         p0=[t0, t_r, t_f, Q, dV, V0]
         try:
-            p,q = curve_fit(fit_func, self.t, waveform, p0=p0)
+            p, q = curve_fit(fit_func, self.t, waveform, p0=p0)
             return p, q
         except: 
-            return np.full((len(p0)), np.inf), np.full((len(p0),len(p0)), np.inf)
+            return np.full((len(p0)), np.inf), np.full((len(p0), len(p0)), np.inf)
 
-def gauss_fit(x,x0,a,sigma):
+    def get_hist_avg(self, df, key, ext='pdf', tp='hist', fit_func, tries=20, dh=200, max_err=1e-3):
+            t = [[], [], [], []]
+            color = ['red', 'blue']
+            for l in L:
+                tm = [0, 0, 0, 0]
+                plt.cla(); plt.clf()
+                for ch in range(self.channels):
+                    c = df[(df['L']==l) & (df['CH']==ch)][key]
+                    a, b = np.histogram(c, dh, density=True)
+                    wg = np.average(b[:-1], weights=a)
+                    try:
+                        p, q = curve_fit(fit_func, b[:-1], a)
+                        print(f'L={l} {p[0]}   {np.sqrt(q[0, 0])}')
+                        dhh = dh
+                        while np.sqrt(np.diag(q)[0])>max_err and tries>0:
+                            dhh += int((200)/tries)
+                            tries -= 1
+                            a, b = np.histogram(c, dhh, density=True)
+                            pp, qq = curve_fit(fit_func, b[:-1], a)
+                            print(f'\t try {tries} {pp[0]} {np.sqrt(qq[0, 0])}')
+                            if np.sqrt(np.diag(q)[0]) > np.sqrt(np.diag(qq)[0]):
+                                p = pp
+                                q = qq
+                                dh = dhh
+                    except Exception as e:
+                        p = np.array([wg, 5e-2, 5e2])
+                        q = np.array([1])
+                        print(f'ayy {e}')
+                        continue
+                    tm[ch] = p[0]
+                    tm[2+ch] = np.sqrt(np.diag(q)[0])
+                    if self.charts_path:
+                        sns.lineplot(x=b[:-1], y=a, color=color[ch], label=f'CH{ch}')
+                        sns.lineplot(x=b[:-1], y=fit_func(b[:-1], *p), ls='--', alpha=0.6, color='black')
+                if self.charts_path:
+                    plt.title(f'L={l}cm')
+                    plt.xlabel(key)
+                    plt.legend()
+                    plt.savefig(self.charts_path.joinpath(f'{tp}_{key}_{l}cm').with_suffix(self.chart_ext))
+                    plt.clf(); plt.cla()
+
+                t[0].append(tm[0])
+                t[1].append(tm[1])
+                t[2].append(tm[2])
+                t[3].append(tm[3])
+            return t
+
+    def get_wg_avg(self, key, ext='pdf', tp='wg', dh=200):
+        t = [[], []]
+        color = ['red', 'blue']
+        for l in L:
+            tm = [0, 0, 0, 0]
+            cc = [0, 0]
+            for ch in range(2):
+                cc[ch] = df[(df['L']==l) & (df['CH']==ch)][key]
+                a, b = np.histogram(cc[ch], dh)
+                tm[ch] = np.average(b[:-1], weights=a)
+                tm[2+ch] = 1
+                t[0].append(tm[0])
+                t[1].append(tm[1])
+                t[2].append(tm[2])
+                t[3].append(tm[3])
+                #p, q = curve_fit(gauss_fit, b[:-1], a)
+            if self.charts_path:
+                g1 = sns.histplot(x=cc[0], bins=dh, color=color[0], label=f'CH0', alpha=0.3)
+                g1.axvline(tm[ch], ls='--', lw=2, c=color[0])
+                g2 = sns.histplot(x=cc[1], bins=dh, color=color[1], label=f'CH1', alpha=0.3)
+                g2.axvline(tm[ch], ls='--', lw=2, c=color[1])
+                plt.title(f'L={l}cm')
+                plt.xlabel(key)
+                plt.legend()
+                plt.savefig(self.charts_path.joinpath(f'{tp}_{key}_{l}cm').with_suffix(self.chart_ext)); plt.clf(); plt.cla()
+        return t
+
+def gauss_fit(x, x0, a, sigma):
     return a*np.exp(-(x-x0)**2/(2*sigma**2))
 
 def asymgauss_fit(x, m1, m0, m2, m3):
@@ -355,15 +442,15 @@ def landau_fit(x, E, S, N):
     return N/np.sqrt(2*np.pi) * np.exp((((E-x)/S)-np.exp(-((x-E)/S))) /2)
 
 def sig_fit(t, t0, t_r, t_f, Q, dV, V0=0):
-	return V0 + dV*t + np.heaviside(t-t0, 0) * Q/(t_r-t_f) * (np.exp(-(t-t0)/t_r) - np.exp(-(t-t0)/t_f)) 
-	#return V0 + dV*t + np.heaviside(t-t0, 0) * Q/t_f * (1 + t_r/t_f) * (1 - np.exp(-(t-t0)/t_r)) * np.exp(-(t-t0)/t_f)
+    return V0 + dV*t + np.heaviside(t-t0, 0) * Q/(t_r-t_f) * (np.exp(-(t-t0)/t_r) - np.exp(-(t-t0)/t_f)) 
+    #return V0 + dV*t + np.heaviside(t-t0, 0) * Q/t_f * (1 + t_r/t_f) * (1 - np.exp(-(t-t0)/t_r)) * np.exp(-(t-t0)/t_f)
 
 def get_wf_params(root_filename):
     events = DigitizerEventData.create_from_file(root_filename)
     waveforms_channel = [[event.waveform for event in events[0]], [event.waveform for event in events[1]]]
     with click.progressbar(range(len(waveforms_channel[0]))) as bar:
-        p_tab = [[],[]]
-        p_cov = [[],[]]
+        p_tab = [[], []]
+        p_cov = [[], []]
         for nwf in bar:
             tmp_p = [False, False]
             tmp_c = [False, False]
@@ -383,13 +470,13 @@ def get_wf_params(root_filename):
 
                 try:
                     p0=[t0, t_r, t_f, Q, dV, V0]
-                    p,q = curve_fit(sig_fit, T, wf, p0=p0)
+                    p, q = curve_fit(sig_fit, T, wf, p0=p0)
                     if np.any(np.diag(q) != np.inf):
                         tmp_p[nchannel] = list(p)
                         tmp_c[nchannel] = list(np.sqrt(np.diag(q)))
 
                     if not argv[1] == 'quiet':
-                        plt.plot(T, sig_fit(T,*p), label="fit")
+                        plt.plot(T, sig_fit(T, *p), label="fit")
                         plt.plot(T, wf, label="waveform")
                         plt.legend()
                         plt.title(f'Waveform no. {nwf} {nchannel=}')
@@ -412,21 +499,21 @@ def get_wf_params(root_filename):
 
         plt.clf()
         if argv[2] == 'trf':
-            plt.hist(p_tab[0][1],bins=100, range=[0,10], label='t_r (0)', alpha=0.3)
-            plt.hist(p_tab[0][2],bins=100, range=[0,10], label='t_f (0)', alpha=0.3)
-            plt.hist(p_tab[1][1],bins=100, range=[0,10], label='t_r (1)', alpha=0.3)
-            plt.hist(p_tab[1][2],bins=100, range=[0,10], label='t_f (1)', alpha=0.3)
+            plt.hist(p_tab[0][1], bins=100, range=[0, 10], label='t_r (0)', alpha=0.3)
+            plt.hist(p_tab[0][2], bins=100, range=[0, 10], label='t_f (0)', alpha=0.3)
+            plt.hist(p_tab[1][1], bins=100, range=[0, 10], label='t_r (1)', alpha=0.3)
+            plt.hist(p_tab[1][2], bins=100, range=[0, 10], label='t_f (1)', alpha=0.3)
             plt.legend()
             plt.show()
             plt.clf()
-            plt.hist(p_tab[0][0],bins=100, range=[0,10], label='t0 (0)', alpha=0.3)
-            plt.hist(p_tab[1][0],bins=100, range=[0,10], label='t0 (1)', alpha=0.3)
+            plt.hist(p_tab[0][0], bins=100, range=[0, 10], label='t0 (0)', alpha=0.3)
+            plt.hist(p_tab[1][0], bins=100, range=[0, 10], label='t0 (1)', alpha=0.3)
             plt.legend()
             plt.show()
             plt.clf()
 
 
-        hp = plt.hist(p_tab[1][0] - p_tab[0][0] ,bins=100, range=[-10,10], label='t1-t0', alpha=0.3,density=True)
+        hp = plt.hist(p_tab[1][0] - p_tab[0][0], bins=100, range=[-10, 10], label='t1-t0', alpha=0.3, density=True)
         hm = np.sum(hp[1][:-1]*hp[0])/np.sum(hp[0])# np.mean(p_tab[1][0]-p_tab[0][0])
         #plt.title(f't1-t0 ~ {hm}')
         #plt.legend()
