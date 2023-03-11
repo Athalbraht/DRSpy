@@ -5,6 +5,7 @@ __version__ = 'v0.1'
 import os
 import toml
 import click
+import inspect
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -350,68 +351,80 @@ class Analysis():
         except: 
             return np.full((len(p0)), np.inf), np.full((len(p0), len(p0)), np.inf)
 
-    def get_hist_avg(self, df, key, fit_func, ext='pdf', tp='hist', tries=20, dh=200, max_err=1e-3):
-            t = [[], [], [], []]
-            color = ['red', 'blue']
-            for l in L:
-                tm = [0, 0, 0, 0]
-                plt.cla(); plt.clf()
-                for ch in range(self.channels):
-                    c = df[(df['L']==l) & (df['CH']==ch)][key]
-                    a, b = np.histogram(c, dh, density=True)
-                    wg = np.average(b[:-1], weights=a)
+    def get_hist_avg(self, key, fit_func, ext='pdf', tp='hist', tries=20, dh=100, max_err=0.01):
+        t = [[], [], [], []]
+        params_len = len(inspect.signature(fit_func).parameters.keys())-1
+        color = ['red', 'blue']
+        L = list(set(self.df['L']))
+        for l in L:
+            tm = [0, 0, 0, 0]
+            plt.cla(); plt.clf()
+            for ch in range(self.channels):
+                c = self.df[(self.df['L']==l) & (self.df['CH']==ch)][key]
+                a, b = np.histogram(c, dh, density=True)
+                wg = np.average(b[:-1], weights=a)
+                try:
                     try:
                         p, q = curve_fit(fit_func, b[:-1], a)
-                        print(f'L={l} {p[0]}   {np.sqrt(q[0, 0])}')
-                        dhh = dh
-                        while np.sqrt(np.diag(q)[0])>max_err and tries>0:
-                            dhh += int((200)/tries)
-                            tries -= 1
-                            a, b = np.histogram(c, dhh, density=True)
-                            pp, qq = curve_fit(fit_func, b[:-1], a)
-                            print(f'\t try {tries} {pp[0]} {np.sqrt(qq[0, 0])}')
+                    except Exception as e:
+                        print(f'first {e}')
+                        p = np.ones(params_len)
+                        q = np.full((params_len, params_len),2)
+                    print(f'L={l} {p[0]}   {np.sqrt(q[0, 0])}')
+                    dhh = dh
+                    _tries = tries
+                    while np.abs(np.sqrt(np.diag(q)[0])/p[0])>max_err and _tries>0:
+                        dhh += int((200)/tries)
+                        _tries -= 1
+                        a, b = np.histogram(c, dhh, density=True)
+                        try:
+                            pp, qq = curve_fit(fit_func, b[:-1], a, p0=[wg]+list(range(params_len-1)))
+                            print(f'\t try {_tries} {pp[0]} {np.sqrt(qq[0, 0])}')
                             if np.sqrt(np.diag(q)[0]) > np.sqrt(np.diag(qq)[0]):
                                 p = pp
                                 q = qq
-                                dh = dhh
-                    except Exception as e:
-                        p = np.array([wg, 5e-2, 5e2])
-                        q = np.array([1])
-                        print(f'ayy {e}')
-                        continue
-                    tm[ch] = p[0]
-                    tm[2+ch] = np.sqrt(np.diag(q)[0])
-                    if self.charts_path:
-                        sns.lineplot(x=b[:-1], y=a, color=color[ch], label=f'CH{ch}')
-                        sns.lineplot(x=b[:-1], y=fit_func(b[:-1], *p), ls='--', alpha=0.6, color='black')
+                                #dh = dhh
+                        except Exception as e:
+                            print(f'->\t {e}')
+                            
+                except Exception as e:
+                    p = np.array([wg, 5e-2, 5e2])
+                    q = np.array([1])
+                    print(f'ayy {e}')
+                    continue
+                tm[ch] = p[0]
+                tm[2+ch] = np.sqrt(np.diag(q)[0])
                 if self.charts_path:
-                    plt.title(f'L={l}cm')
-                    plt.xlabel(key)
-                    plt.legend()
-                    plt.savefig(self.charts_path.joinpath(f'{tp}_{key}_{l}cm').with_suffix(self.chart_ext))
-                    plt.clf(); plt.cla()
+                    sns.lineplot(x=b[:-1], y=a, color=color[ch], label=f'CH{ch}')
+                    sns.lineplot(x=b[:-1], y=fit_func(b[:-1], *p), ls='--', alpha=0.6, color='black')
+            if self.charts_path:
+                plt.title(f'L={l}cm')
+                plt.xlabel(key)
+                plt.legend()
+                #plt.show()
+                plt.savefig(self.charts_path.joinpath('stats').joinpath(f'{tp}_{key}_{l}cm').with_suffix(self.chart_ext))
+                plt.clf(); plt.cla()
 
-                t[0].append(tm[0])
-                t[1].append(tm[1])
-                t[2].append(tm[2])
-                t[3].append(tm[3])
-            return t
+            t[0].append(tm[0])
+            t[1].append(tm[1])
+            t[2].append(tm[2])
+            t[3].append(tm[3])
+        return t
 
     def get_wg_avg(self, key, ext='pdf', tp='wg', dh=200):
-        t = [[], []]
+        t = [[], [], [], []]
         color = ['red', 'blue']
+        L = list(set(self.df['L']))
         for l in L:
             tm = [0, 0, 0, 0]
             cc = [0, 0]
             for ch in range(2):
-                cc[ch] = df[(df['L']==l) & (df['CH']==ch)][key]
+                cc[ch] = self.df[(self.df['L']==l) & (self.df['CH']==ch)][key]
                 a, b = np.histogram(cc[ch], dh)
                 tm[ch] = np.average(b[:-1], weights=a)
                 tm[2+ch] = 1
-                t[0].append(tm[0])
-                t[1].append(tm[1])
-                t[2].append(tm[2])
-                t[3].append(tm[3])
+                t[ch].append(tm[ch])
+                t[2+ch].append(tm[2+ch])
                 #p, q = curve_fit(gauss_fit, b[:-1], a)
             if self.charts_path:
                 g1 = sns.histplot(x=cc[0], bins=dh, color=color[0], label=f'CH0', alpha=0.3)
@@ -421,7 +434,8 @@ class Analysis():
                 plt.title(f'L={l}cm')
                 plt.xlabel(key)
                 plt.legend()
-                plt.savefig(self.charts_path.joinpath(f'{tp}_{key}_{l}cm').with_suffix(self.chart_ext)); plt.clf(); plt.cla()
+                #plt.savefig(self.charts_path.joinpath(f'{tp}_{key}_{l}cm').with_suffix(self.chart_ext)); plt.clf(); plt.cla()
+                plt.show()
         return t
 
 def gauss_fit(x, x0, a, sigma):
@@ -536,10 +550,14 @@ def get_wf_params(root_filename):
 
 if __name__ == '__main__':
     print('Usage: python analysis.py <data_folder>')
-    run = Analysis(argv[1], charts_path=argv[2], limit_file=argv[3])
-    dff = run.load_waveforms(run.decode_filename, sig_fit)
-    run.prepare(dff)
-    run.plot_lin(lin_fit)
-    run.plot_signal(lin_fit)
-    run.plot_joint()
+    run = Analysis(argv[1], charts_path=argv[3], limit_file=argv[2])
+    df = pd.read_csv(argv[4])
+    run.df = df[df['Q']>-1.2]
+    run.chart_ext = '.png'
+
+    #dff = run.load_waveforms(run.decode_filename, sig_fit)
+    #run.prepare(dff)
+    #run.plot_lin(lin_fit)
+    #run.plot_signal(lin_fit)
+    #run.plot_joint()
 
