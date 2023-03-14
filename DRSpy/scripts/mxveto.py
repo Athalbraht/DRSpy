@@ -3,10 +3,10 @@ from __future__ import annotations
 __version__ = "v0.1"
 
 import inspect
-import os
+# import os
 from pathlib import Path
 from sys import argv
-from typing import *
+from typing import Any, Callable
 
 import click
 import matplotlib.pyplot as plt
@@ -14,8 +14,8 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import toml
-from DRSpy.plugins.digitizer_reader import *
-from scipy import stats
+from DRSpy.plugins.digitizer_reader import DigitizerEventData
+# from scipy import stats
 # from digitizer_reader import *
 from scipy.optimize import curve_fit
 from scipy.special import erf
@@ -28,12 +28,12 @@ class Analysis:
         self,
         data_path: str,
         limit_file: str | None = None,
-        charts_path: Path | None = None,
+        charts_path: str | None = None,
     ) -> None:
         """
-        data_path:      path to folder with .root files
-        limit_file:     path to .root file. Reading events from other files will be limited to limit_file size.
-        charts_path:    path to plots output folder
+        data_path:     path to folder with .root files
+        limit_file:    path to .root file. Reading events from other files will be limited to limit_file size.
+        charts_path:   path to plots output folder
         """
         # init params
         self.files = []
@@ -181,10 +181,10 @@ class Analysis:
 
     def toml_manager(self) -> None:
         """Init and read config.toml"""
-        print("\->\tChecking config.toml...")
+        print("->\tChecking config.toml...")
         self.config_path = Path(self.data_path.joinpath("config.toml"))
         if self.config_path.exists():
-            self.data = toml.load(self.config_path)
+            self.data: dict[str, Any] = toml.load(self.config_path)
         else:
             print("\t->File not found. Initialization...")
             self.data = {
@@ -195,8 +195,8 @@ class Analysis:
                 "progress": {},
             }
             self.config_path.touch()
-            self.toml.data["mxveto_version"] = __version__
-            self.dump(self.config_path)
+            self.data["mxveto_version"] = __version__
+            self.config_path = toml.dump(self.config_path)
 
     def decode_filename(
         self, filename: str, separator: str = "_", pos: int = 1
@@ -208,7 +208,7 @@ class Analysis:
         except:
             return False
 
-    def load_waveform(self, root_filename: Path) -> List[Any]:
+    def load_waveform(self, root_filename: Path) -> list[Any]:
         """TMP"""
         events = DigitizerEventData.create_from_file(root_filename)
         waveforms = []  # waveform[channel] = [waveforms list, amplitudes list]
@@ -220,14 +220,14 @@ class Analysis:
 
     def load_waveforms(
         self,
-        filename_decoder: Callable[str, float | bool],
-        fit_func: Callable[Any, float],
+        filename_decoder: Callable[[str], float | bool],
+        fit_func: Callable[[Any], float],
         wf_num: int = -1,
     ) -> pd.DataFrame:
         """Load waveforms from self.data_path"""
         evt_counter = 0
-        p_list = [[] for i in range(len(self.df_cols))]  # params & cov list
-        q_list = [[] for i in range(len(self.df_cols))]
+        p_list = [[] for _ in range(len(self.df_cols))]  # params & cov list
+        q_list = [[] for _ in range(len(self.df_cols))]
         for nfile, filename in enumerate(self.files):
             source_position = filename_decoder(filename.name)
             if not isinstance(source_position, float):
@@ -278,7 +278,7 @@ class Analysis:
         params_dict = dict(zip(self.df_cols + self.df_cols_sigma, p_list + q_list))
         return pd.DataFrame(params_dict)
 
-    def prepare(self, raw_df: pd.DataFrame | str) -> Tuple[pd.DataFrame]:
+    def prepare(self, raw_df: pd.DataFrame | str) -> tuple[pd.DataFrame]:
         """Filter raw DataFrame and extract only useful entries. The method generates filtered df with relative errors, groups by event and source position (ddf) and"""
         print("->\tCreating DataFrame")
         if isinstance(raw_df, str):
@@ -380,53 +380,53 @@ class Analysis:
             tt[i].append(b)
 
         """
-        print('->\t Calculating mean values... (ddf)')
-        self.dddf_cols = ['CH', 'L', 'wg_t_0', 'hist_t_0', 'wg_t_r', 'hist_r_r', 'wg_f_f', 'hist_t_f', 'wg_Q', 'hist_Q', 
-                          'sig_CH', 'sig_L', 'sig_wg_t_0', 'sig_hist_t_0', 'sig_wg_t_r', 'sig_hist_r_r', 'sig_wg_f_f', 'sig_hist_t_f', 'sig_wg_Q', 'sig_hist_Q', ] 
-        cols = ['t_0', 't_r', 't_f', 'Q', 'A']
-        hist_fit_func = [gauss_fit for i in range(3)] + [landau_fit, landau_fit]
-        cols2 = ['dt', 'ln', 'sqrt', 'asym']
-        _cols2 = []
-        _cols = []
-        for col in cols2:
+      print('->\t Calculating mean values... (ddf)')
+      self.dddf_cols = ['CH', 'L', 'wg_t_0', 'hist_t_0', 'wg_t_r', 'hist_r_r', 'wg_f_f', 'hist_t_f', 'wg_Q', 'hist_Q', 
+                    'sig_CH', 'sig_L', 'sig_wg_t_0', 'sig_hist_t_0', 'sig_wg_t_r', 'sig_hist_r_r', 'sig_wg_f_f', 'sig_hist_t_f', 'sig_wg_Q', 'sig_hist_Q', ] 
+      cols = ['t_0', 't_r', 't_f', 'Q', 'A']
+      hist_fit_func = [gauss_fit for i in range(3)] + [landau_fit, landau_fit]
+      cols2 = ['dt', 'ln', 'sqrt', 'asym']
+      _cols2 = []
+      _cols = []
+      for col in cols2:
+         for tp in ['wg', 'hist']:
+            _cols2.append(f'{tp}_{col}')
+      for col in cols:
+         for channel in range(self.channels): 
             for tp in ['wg', 'hist']:
-                _cols2.append(f'{tp}_{col}')
-        for col in cols:
-            for channel in range(self.channels): 
-                for tp in ['wg', 'hist']:
-                    _cols.append(f'{tp}_{col}_ch{channel}')
+               _cols.append(f'{tp}_{col}_ch{channel}')
 
-        sig_cols = ['sig_'+i for i in _cols+_cols2]
-        columns = ['L']+_cols+_cols2+sig_cols
-        df_dict = dict(zip(columns, [[] for i in range(len(columns))]))
-        with click.progressbar(set(self.df['L']), label='Creating ddf DataFrame') as bar:
-            for pos in bar:
-                _ddf = self.ddf[(self.ddf['L']==pos)]
-                df_dict['L'].append(pos)
-                for nch, channel in enumerate([f'_ch{i}' for i in range(self.channels)]):
-                    _df = self.df[(self.df['L']==pos) & (self.df['CH']==nch)]
-                    for nc, col in enumerate(cols):
-                        ha, hb = np.histogram(_df[col], self.hist_density)
-                        df_dict['wg_'+col+f'_ch{nch}'].append(np.average(hb[:-1], weights=ha))
-                        df_dict['sig_wg_'+col+f'_ch{nch}'].append(0.1)
+      sig_cols = ['sig_'+i for i in _cols+_cols2]
+      columns = ['L']+_cols+_cols2+sig_cols
+      df_dict = dict(zip(columns, [[] for i in range(len(columns))]))
+      with click.progressbar(set(self.df['L']), label='Creating ddf DataFrame') as bar:
+         for pos in bar:
+            _ddf = self.ddf[(self.ddf['L']==pos)]
+            df_dict['L'].append(pos)
+            for nch, channel in enumerate([f'_ch{i}' for i in range(self.channels)]):
+               _df = self.df[(self.df['L']==pos) & (self.df['CH']==nch)]
+               for nc, col in enumerate(cols):
+                  ha, hb = np.histogram(_df[col], self.hist_density)
+                  df_dict['wg_'+col+f'_ch{nch}'].append(np.average(hb[:-1], weights=ha))
+                  df_dict['sig_wg_'+col+f'_ch{nch}'].append(0.1)
 
-                        p, q = curve_fit(hist_fit_func[nc], hb[:-1], ha)
-                        df_dict['hist_'+col+f'_ch{nch}'].append(p[0])
-                        df_dict['sig_hist_'+col+f'_ch{nch}'].append(np.sqrt(np.diag(q))[0])
-                for m in ['wg', 'hist']:
-                    df_dict[f'{m}_dt'].append(df_dict[f'{m}_t_0_ch1'][-1] - df_dict[f'{m}_t_0_ch0'][-1])
-                    df_dict[f'sig_{m}_dt'].append(np.sqrt(df_dict[f'sig_{m}_t_0_ch1'][-1]**2 + df_dict[f'sig_{m}_t_0_ch0'][-1]**2))
+                  p, q = curve_fit(hist_fit_func[nc], hb[:-1], ha)
+                  df_dict['hist_'+col+f'_ch{nch}'].append(p[0])
+                  df_dict['sig_hist_'+col+f'_ch{nch}'].append(np.sqrt(np.diag(q))[0])
+            for m in ['wg', 'hist']:
+               df_dict[f'{m}_dt'].append(df_dict[f'{m}_t_0_ch1'][-1] - df_dict[f'{m}_t_0_ch0'][-1])
+               df_dict[f'sig_{m}_dt'].append(np.sqrt(df_dict[f'sig_{m}_t_0_ch1'][-1]**2 + df_dict[f'sig_{m}_t_0_ch0'][-1]**2))
 
-                    df_dict[f'{m}_ln'].append(np.log((df_dict[f'{m}_Q_ch1'][-1])/(df_dict[f'{m}_Q_ch1'][-1])))
-                    df_dict[f'sig_{m}_ln'].append(np.sqrt((df_dict[f'sig_{m}_Q_ch1'][-1]/df_dict[f'{m}_Q_ch1'][-1])**2 + (df_dict[f'sig_{m}_Q_ch0'][-1]/df_dict[f'{m}_Q_ch0'][-1])**2))
+               df_dict[f'{m}_ln'].append(np.log((df_dict[f'{m}_Q_ch1'][-1])/(df_dict[f'{m}_Q_ch1'][-1])))
+               df_dict[f'sig_{m}_ln'].append(np.sqrt((df_dict[f'sig_{m}_Q_ch1'][-1]/df_dict[f'{m}_Q_ch1'][-1])**2 + (df_dict[f'sig_{m}_Q_ch0'][-1]/df_dict[f'{m}_Q_ch0'][-1])**2))
 
-                    df_dict[f'{m}_asym'].append((df_dict[f'{m}_Q_ch0'][-1]-df_dict[f'{m}_Q_ch1'][-1])/(df_dict[f'{m}_Q_ch0'][-1]+df_dict[f'{m}_Q_ch1'][-1]))
-                    df_dict[f'sig_{m}_asym'].append(np.sqrt((2*df_dict[f'sig_{m}_Q_ch0'][-1]*df_dict[f'{m}_Q_ch1'][-1]/(df_dict[f'{m}_Q_ch1'][-1]+df_dict[f'{m}_Q_ch0'][-1])**2)**2 + (2*df_dict[f'sig_{m}_Q_ch1'][-1]*df_dict[f'{m}_Q_ch0'][-1]/(df_dict[f'{m}_Q_ch1'][-1]+df_dict[f'{m}_Q_ch0'][-1])**2)**2))
+               df_dict[f'{m}_asym'].append((df_dict[f'{m}_Q_ch0'][-1]-df_dict[f'{m}_Q_ch1'][-1])/(df_dict[f'{m}_Q_ch0'][-1]+df_dict[f'{m}_Q_ch1'][-1]))
+               df_dict[f'sig_{m}_asym'].append(np.sqrt((2*df_dict[f'sig_{m}_Q_ch0'][-1]*df_dict[f'{m}_Q_ch1'][-1]/(df_dict[f'{m}_Q_ch1'][-1]+df_dict[f'{m}_Q_ch0'][-1])**2)**2 + (2*df_dict[f'sig_{m}_Q_ch1'][-1]*df_dict[f'{m}_Q_ch0'][-1]/(df_dict[f'{m}_Q_ch1'][-1]+df_dict[f'{m}_Q_ch0'][-1])**2)**2))
 
-                    df_dict[f'{m}_sqrt'].append(np.sqrt(df_dict[f'{m}_Q_ch0'][-1]*df_dict[f'{m}_Q_ch1'][-1]))
-                    df_dict[f'sig_{m}_sqrt'].append(np.sqrt((df_dict[f'sig_{m}_Q_ch0'][-1]*df_dict[f'{m}_Q_ch1'][-1]/(2*np.sqrt(df_dict[f'{m}_Q_ch0'][-1]*df_dict[f'{m}_Q_ch1'][-1])))**2 + (df_dict[f'sig_{m}_Q_ch1'][-1]*df_dict[f'{m}_Q_ch0'][-1]/(2*np.sqrt(df_dict[f'{m}_Q_ch0'][-1]*df_dict[f'{m}_Q_ch1'][-1])))**2))
-        self.dddf = pd.DataFrame(df_dict)
-        """
+               df_dict[f'{m}_sqrt'].append(np.sqrt(df_dict[f'{m}_Q_ch0'][-1]*df_dict[f'{m}_Q_ch1'][-1]))
+               df_dict[f'sig_{m}_sqrt'].append(np.sqrt((df_dict[f'sig_{m}_Q_ch0'][-1]*df_dict[f'{m}_Q_ch1'][-1]/(2*np.sqrt(df_dict[f'{m}_Q_ch0'][-1]*df_dict[f'{m}_Q_ch1'][-1])))**2 + (df_dict[f'sig_{m}_Q_ch1'][-1]*df_dict[f'{m}_Q_ch0'][-1]/(2*np.sqrt(df_dict[f'{m}_Q_ch0'][-1]*df_dict[f'{m}_Q_ch1'][-1])))**2))
+      self.dddf = pd.DataFrame(df_dict)
+      """
 
     def plot_waveforms(self, w0, w1, fit_func, note, df) -> None:
         f, ax = plt.subplots(
@@ -618,8 +618,8 @@ class Analysis:
             plt.clf()
 
     def get_waveform_fit(
-        self, fit_func: Callable[Any, float], waveform: np.ndarray
-    ) -> Tuple[np.ndarray, np.ndarray]:
+        self, fit_func: Callable[[Any], float], waveform: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray]:
         get_t0 = lambda t_m, t_r, t_f: t_m - t_r * t_f / (t_f - t_r) * np.log(t_f / t_r)
         t_max = self.t[np.argmin(waveform)]
         t_r = 2.9
@@ -778,108 +778,6 @@ def sig_fit(t, t0, t_r, t_f, Q, dV, V0=0):
         * (np.exp(-(t - t0) / t_r) - np.exp(-(t - t0) / t_f))
     )
     # return V0 + dV*t + np.heaviside(t-t0, 0) * Q/t_f * (1 + t_r/t_f) * (1 - np.exp(-(t-t0)/t_r)) * np.exp(-(t-t0)/t_f)
-
-
-def get_wf_params(root_filename):
-    events = DigitizerEventData.create_from_file(root_filename)
-    waveforms_channel = [
-        [event.waveform for event in events[0]],
-        [event.waveform for event in events[1]],
-    ]
-    with click.progressbar(range(len(waveforms_channel[0]))) as bar:
-        p_tab = [[], []]
-        p_cov = [[], []]
-        for nwf in bar:
-            tmp_p = [False, False]
-            tmp_c = [False, False]
-            for nchannel in range(2):
-                wf = waveforms_channel[nchannel][nwf]
-                _w = 5
-                wf = np.convolve(wf, np.ones(_w), "valid") / _w
-                T = 0.2 * np.arange(0, len(wf))
-                t_max = T[np.argmin(wf)]
-                t_r = 2.9
-                t_f = 3
-                t0 = get_t0(t_max, t_r, t_f)
-
-                V0 = np.mean(wf[nwf : nwf + 10])
-                dV = (np.mean(wf[-10 - nwf :]) - V0) / T[-1]
-                Q = np.sum(wf * 0.2) - V0 * T[-1] - 0.5 * dV * T[-1] ** 2
-
-                try:
-                    p0 = [t0, t_r, t_f, Q, dV, V0]
-                    p, q = curve_fit(sig_fit, T, wf, p0=p0)
-                    if np.any(np.diag(q) != np.inf):
-                        tmp_p[nchannel] = list(p)
-                        tmp_c[nchannel] = list(np.sqrt(np.diag(q)))
-
-                    if not argv[1] == "quiet":
-                        plt.plot(T, sig_fit(T, *p), label="fit")
-                        plt.plot(T, wf, label="waveform")
-                        plt.legend()
-                        plt.title(f"Waveform no. {nwf} {nchannel=}")
-                        print(f"\nFit params: {p0[nchannel]=}")
-                        print(f"\nFit params: {p[nchannel]=}")
-                        plt.show()
-                except:
-                    pass
-            if tmp_p[0] and tmp_p[1]:
-                p_tab[0].append(tmp_p[0])
-                p_tab[1].append(tmp_p[1])
-                p_cov[0].append(tmp_c[0])
-                p_cov[1].append(tmp_c[1])
-
-        ##### TMP
-
-        p_tab = [np.array(p_tab[0]).T, np.array(p_tab[1]).T]
-        p_cov = [np.array(p_cov[0]).T, np.array(p_cov[1]).T]
-
-        plt.clf()
-        if argv[2] == "trf":
-            plt.hist(p_tab[0][1], bins=100, range=[0, 10], label="t_r (0)", alpha=0.3)
-            plt.hist(p_tab[0][2], bins=100, range=[0, 10], label="t_f (0)", alpha=0.3)
-            plt.hist(p_tab[1][1], bins=100, range=[0, 10], label="t_r (1)", alpha=0.3)
-            plt.hist(p_tab[1][2], bins=100, range=[0, 10], label="t_f (1)", alpha=0.3)
-            plt.legend()
-            plt.show()
-            plt.clf()
-            plt.hist(p_tab[0][0], bins=100, range=[0, 10], label="t0 (0)", alpha=0.3)
-            plt.hist(p_tab[1][0], bins=100, range=[0, 10], label="t0 (1)", alpha=0.3)
-            plt.legend()
-            plt.show()
-            plt.clf()
-
-        hp = plt.hist(
-            p_tab[1][0] - p_tab[0][0],
-            bins=100,
-            range=[-10, 10],
-            label="t1-t0",
-            alpha=0.3,
-            density=True,
-        )
-        hm = np.sum(hp[1][:-1] * hp[0]) / np.sum(
-            hp[0]
-        )  # np.mean(p_tab[1][0]-p_tab[0][0])
-        # plt.title(f't1-t0 ~ {hm}')
-        # plt.legend()
-        # plt.show()
-
-        ## GET STATS
-
-        dt0 = 1 / (p_cov[0] ** 2 + p_cov[1] ** 2)
-        # t0_delay = np.sum()/np.sum()
-
-        t0_0 = p_tab[0][0]
-        dt0_0 = p_cov[0][0] * nstd
-        t0_1 = p_tab[1][0]
-        dt0_1 = p_cov[1][0] * nstd
-
-        Q_0 = p_tab[0][3]
-        dQ_0 = p_cov[0][3] * nstd
-        Q_1 = p_tab[1][3]
-        dQ_1 = p_cov[1][3] * nstd
-
-        return [t0_0, dt0_0, t0_1, dt0_1, Q_0, dQ_0, Q_1, dQ_1]
 
 
 if __name__ == "__main__":
