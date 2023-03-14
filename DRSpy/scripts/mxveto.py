@@ -3,6 +3,7 @@ from __future__ import annotations
 __version__ = "v0.1"
 
 import inspect
+
 # import os
 from pathlib import Path
 from sys import argv
@@ -11,10 +12,12 @@ from typing import Any, Callable
 import click
 import matplotlib.pyplot as plt
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 import seaborn as sns
 import toml
 from DRSpy.plugins.digitizer_reader import DigitizerEventData
+
 # from scipy import stats
 # from digitizer_reader import *
 from scipy.optimize import curve_fit
@@ -205,7 +208,8 @@ class Analysis:
         try:
             position = float(filename.split(separator)[pos])
             return position
-        except:
+        except Exception as e:
+            print(f"Can't decode filename. Skip\n{e}")
             return False
 
     def load_waveform(self, root_filename: Path) -> list[Any]:
@@ -272,14 +276,17 @@ class Analysis:
                                 f"Waveform $L={source_position}$cm",
                                 plot_df,
                             )
-                        except:
+                        except Exception as e:
+                            print(f"Can't create plot. Clearing figure...\n{e}")
                             plt.clf()
                             plt.cla()
         params_dict = dict(zip(self.df_cols + self.df_cols_sigma, p_list + q_list))
         return pd.DataFrame(params_dict)
 
     def prepare(self, raw_df: pd.DataFrame | str) -> tuple[pd.DataFrame]:
-        """Filter raw DataFrame and extract only useful entries. The method generates filtered df with relative errors, groups by event and source position (ddf) and"""
+        """Filter raw DataFrame and extract only useful entries.
+        The method generates filtered df with relative errors, groups by event and source position (ddf) and
+        """
         print("->\tCreating DataFrame")
         if isinstance(raw_df, str):
             self.df = pd.read_csv(raw_df)
@@ -369,64 +376,10 @@ class Analysis:
             (np.abs(self.ddf["asymQ"]) < 4) & (np.abs(self.ddf["lnQ"])) < 4
         ]
 
-        col = ["t_0", "t_r", "t_f", "Q", "A", "V_0", "dV"]
-        hcol = ["t_r", "t_f", "Q", "A", "V_0", "dV"]
-        tt = [[] for i in range(len(col))]
-        dh = 200
-
-        for i in range(len(col)):
-            a, b = ax(col[i])
-            tt[i].append(a)
-            tt[i].append(b)
-
-        """
-      print('->\t Calculating mean values... (ddf)')
-      self.dddf_cols = ['CH', 'L', 'wg_t_0', 'hist_t_0', 'wg_t_r', 'hist_r_r', 'wg_f_f', 'hist_t_f', 'wg_Q', 'hist_Q', 
-                    'sig_CH', 'sig_L', 'sig_wg_t_0', 'sig_hist_t_0', 'sig_wg_t_r', 'sig_hist_r_r', 'sig_wg_f_f', 'sig_hist_t_f', 'sig_wg_Q', 'sig_hist_Q', ] 
-      cols = ['t_0', 't_r', 't_f', 'Q', 'A']
-      hist_fit_func = [gauss_fit for i in range(3)] + [landau_fit, landau_fit]
-      cols2 = ['dt', 'ln', 'sqrt', 'asym']
-      _cols2 = []
-      _cols = []
-      for col in cols2:
-         for tp in ['wg', 'hist']:
-            _cols2.append(f'{tp}_{col}')
-      for col in cols:
-         for channel in range(self.channels): 
-            for tp in ['wg', 'hist']:
-               _cols.append(f'{tp}_{col}_ch{channel}')
-
-      sig_cols = ['sig_'+i for i in _cols+_cols2]
-      columns = ['L']+_cols+_cols2+sig_cols
-      df_dict = dict(zip(columns, [[] for i in range(len(columns))]))
-      with click.progressbar(set(self.df['L']), label='Creating ddf DataFrame') as bar:
-         for pos in bar:
-            _ddf = self.ddf[(self.ddf['L']==pos)]
-            df_dict['L'].append(pos)
-            for nch, channel in enumerate([f'_ch{i}' for i in range(self.channels)]):
-               _df = self.df[(self.df['L']==pos) & (self.df['CH']==nch)]
-               for nc, col in enumerate(cols):
-                  ha, hb = np.histogram(_df[col], self.hist_density)
-                  df_dict['wg_'+col+f'_ch{nch}'].append(np.average(hb[:-1], weights=ha))
-                  df_dict['sig_wg_'+col+f'_ch{nch}'].append(0.1)
-
-                  p, q = curve_fit(hist_fit_func[nc], hb[:-1], ha)
-                  df_dict['hist_'+col+f'_ch{nch}'].append(p[0])
-                  df_dict['sig_hist_'+col+f'_ch{nch}'].append(np.sqrt(np.diag(q))[0])
-            for m in ['wg', 'hist']:
-               df_dict[f'{m}_dt'].append(df_dict[f'{m}_t_0_ch1'][-1] - df_dict[f'{m}_t_0_ch0'][-1])
-               df_dict[f'sig_{m}_dt'].append(np.sqrt(df_dict[f'sig_{m}_t_0_ch1'][-1]**2 + df_dict[f'sig_{m}_t_0_ch0'][-1]**2))
-
-               df_dict[f'{m}_ln'].append(np.log((df_dict[f'{m}_Q_ch1'][-1])/(df_dict[f'{m}_Q_ch1'][-1])))
-               df_dict[f'sig_{m}_ln'].append(np.sqrt((df_dict[f'sig_{m}_Q_ch1'][-1]/df_dict[f'{m}_Q_ch1'][-1])**2 + (df_dict[f'sig_{m}_Q_ch0'][-1]/df_dict[f'{m}_Q_ch0'][-1])**2))
-
-               df_dict[f'{m}_asym'].append((df_dict[f'{m}_Q_ch0'][-1]-df_dict[f'{m}_Q_ch1'][-1])/(df_dict[f'{m}_Q_ch0'][-1]+df_dict[f'{m}_Q_ch1'][-1]))
-               df_dict[f'sig_{m}_asym'].append(np.sqrt((2*df_dict[f'sig_{m}_Q_ch0'][-1]*df_dict[f'{m}_Q_ch1'][-1]/(df_dict[f'{m}_Q_ch1'][-1]+df_dict[f'{m}_Q_ch0'][-1])**2)**2 + (2*df_dict[f'sig_{m}_Q_ch1'][-1]*df_dict[f'{m}_Q_ch0'][-1]/(df_dict[f'{m}_Q_ch1'][-1]+df_dict[f'{m}_Q_ch0'][-1])**2)**2))
-
-               df_dict[f'{m}_sqrt'].append(np.sqrt(df_dict[f'{m}_Q_ch0'][-1]*df_dict[f'{m}_Q_ch1'][-1]))
-               df_dict[f'sig_{m}_sqrt'].append(np.sqrt((df_dict[f'sig_{m}_Q_ch0'][-1]*df_dict[f'{m}_Q_ch1'][-1]/(2*np.sqrt(df_dict[f'{m}_Q_ch0'][-1]*df_dict[f'{m}_Q_ch1'][-1])))**2 + (df_dict[f'sig_{m}_Q_ch1'][-1]*df_dict[f'{m}_Q_ch0'][-1]/(2*np.sqrt(df_dict[f'{m}_Q_ch0'][-1]*df_dict[f'{m}_Q_ch1'][-1])))**2))
-      self.dddf = pd.DataFrame(df_dict)
-      """
+        # col = ["t_0", "t_r", "t_f", "Q", "A", "V_0", "dV"]
+        # hcol = ["t_r", "t_f", "Q", "A", "V_0", "dV"]
+        # tt = [[] for i in range(len(col))]
+        # dh = 200
 
     def plot_waveforms(self, w0, w1, fit_func, note, df) -> None:
         f, ax = plt.subplots(
@@ -595,7 +548,7 @@ class Analysis:
             y=self.lx["t_f"],
             kind="hist",
         )
-        filename = f"joint_t_r-t_f"
+        filename = "joint_t_r-t_f"
         plt.savefig(
             self.charts_path.joinpath("time")
             .joinpath(filename)
@@ -620,11 +573,10 @@ class Analysis:
     def get_waveform_fit(
         self, fit_func: Callable[[Any], float], waveform: np.ndarray
     ) -> tuple[np.ndarray, np.ndarray]:
-        get_t0 = lambda t_m, t_r, t_f: t_m - t_r * t_f / (t_f - t_r) * np.log(t_f / t_r)
         t_max = self.t[np.argmin(waveform)]
         t_r = 2.9
         t_f = 3
-        t0 = get_t0(t_max, t_r, t_f)
+        t0 = t_max - t_r * t_f / (t_f - t_r) * np.log(t_f / t_r)
         V0 = np.mean(waveform[:10])
         dV = (np.mean(waveform[:-10]) - V0) / self.t[-1]
         Q = np.sum(waveform * 0.2) - V0 * self.t[-1] - 0.5 * dV * self.t[-1] ** 2
@@ -633,22 +585,23 @@ class Analysis:
         try:
             p, q = curve_fit(fit_func, self.t, waveform, p0=p0)
             return p, q
-        except:
+        except Exception as e:
+            print(f"Can't calcuclate fit params. Skip'n{e}")
             return np.full((len(p0)), np.inf), np.full((len(p0), len(p0)), np.inf)
 
     def get_hist_avg(
         self, key, fit_func, ext="pdf", tp="hist", tries=20, dh=100, max_err=0.01
     ):
-        t = [[], [], [], [], []]
+        t: list[list[npt.DTypeLike]] = [[], [], [], [], []]
         params_len = len(inspect.signature(fit_func).parameters.keys()) - 1
         color = ["red", "blue"]
         L = list(set(self.df["L"]))
-        for l in L:
-            tm = [0, 0, 0, 0]
+        for pos in L:
+            tm: list[npt.DTypeLike] = [np.float64(0) for _ in range(4)]
             plt.cla()
             plt.clf()
             for ch in range(self.channels):
-                c = self.df[(self.df["L"] == l) & (self.df["CH"] == ch)][key]
+                c = self.df[(self.df["L"] == pos) & (self.df["CH"] == ch)][key]
                 a, b = np.histogram(c, dh, density=True)
                 wg = np.average(b[:-1], weights=a)
                 try:
@@ -658,7 +611,7 @@ class Analysis:
                         print(f"first {e}")
                         p = np.ones(params_len)
                         q = np.full((params_len, params_len), 2)
-                    print(f"L={l} {p[0]}   {np.sqrt(q[0, 0])}")
+                    print(f"L={pos} {p[0]}   {np.sqrt(q[0, 0])}")
                     dhh = dh
                     _tries = tries
                     while (
@@ -699,19 +652,19 @@ class Analysis:
                         color="black",
                     )
             if self.charts_path:
-                plt.title(f"L={l}cm")
+                plt.title(f"L={pos}cm")
                 plt.xlabel(key)
                 plt.legend()
                 # plt.show()
                 plt.savefig(
                     self.charts_path.joinpath("stats")
-                    .joinpath(f"{tp}_{key}_{l}cm")
+                    .joinpath(f"{tp}_{key}_{pos}cm")
                     .with_suffix(self.chart_ext)
                 )
                 plt.clf()
                 plt.cla()
 
-            t[0].append(l)
+            t[0].append(pos)
             t[1].append(tm[0])
             t[2].append(tm[1])
             t[3].append(tm[2])
@@ -719,18 +672,18 @@ class Analysis:
         return t
 
     def get_wg_avg(self, key, ext="pdf", tp="wg", dh=200):
-        t = [[], [], [], [], []]
+        t: list[list[npt.DTypeLike]] = [[], [], [], [], []]
         color = ["red", "blue"]
         L = list(set(self.df["L"]))
-        for l in L:
-            tm = [0, 0, 0, 0]
+        for pos in L:
+            tm: list[npt.DTypeLike] = [np.float64(0) for _ in range(4)]
             cc = [0, 0]
             for ch in range(2):
-                cc[ch] = self.df[(self.df["L"] == l) & (self.df["CH"] == ch)][key]
+                cc[ch] = self.df[(self.df["L"] == pos) & (self.df["CH"] == ch)][key]
                 a, b = np.histogram(cc[ch], dh)
                 tm[ch] = np.average(b[:-1], weights=a)
-                tm[2 + ch] = 1
-                t[0].append(l)
+                tm[2 + ch] = np.float64(1)
+                t[0].append(pos)
                 t[ch + 1].append(tm[ch])
                 t[ch + 3].append(tm[2 + ch])
                 # p, q = curve_fit(gauss_fit, b[:-1], a)
@@ -743,7 +696,7 @@ class Analysis:
                     x=cc[1], bins=dh, color=color[1], label="CH1", alpha=0.3
                 )
                 g2.axvline(tm[ch], ls="--", lw=2, c=color[1])
-                plt.title(f"L={l}cm")
+                plt.title(f"L={pos}cm")
                 plt.xlabel(key)
                 plt.legend()
                 # plt.savefig(self.charts_path.joinpath(f'{tp}_{key}_{l}cm').with_suffix(self.chart_ext)); plt.clf(); plt.cla()
