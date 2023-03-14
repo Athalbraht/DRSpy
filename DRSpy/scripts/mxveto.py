@@ -76,8 +76,8 @@ class Analysis():
                 choice = input("Choice: ")
                 if df_files.get(choice, False):
                     print("->\tLoading DataFrames...")
-                    self.df = pd.read_pickle(df_files[choice].absolute())
-                    self.ddf = pd.read_pickle(
+                    self.df = pd.read_csv(df_files[choice].absolute())
+                    self.ddf = pd.read_csv(
                         df_files[choice].with_suffix(".ddf").absolute()
                     )
             if file.suffix == ".root":
