@@ -639,7 +639,7 @@ class Analysis:
     def get_hist_avg(
         self, key, fit_func, ext="pdf", tp="hist", tries=20, dh=100, max_err=0.01
     ):
-        t = [[], [], [], []]
+        t = [[], [], [], [], []]
         params_len = len(inspect.signature(fit_func).parameters.keys()) - 1
         color = ["red", "blue"]
         L = list(set(self.df["L"]))
@@ -711,14 +711,15 @@ class Analysis:
                 plt.clf()
                 plt.cla()
 
-            t[0].append(tm[0])
-            t[1].append(tm[1])
-            t[2].append(tm[2])
-            t[3].append(tm[3])
+            t[0].append(l)
+            t[1].append(tm[0])
+            t[2].append(tm[1])
+            t[3].append(tm[2])
+            t[4].append(tm[3])
         return t
 
     def get_wg_avg(self, key, ext="pdf", tp="wg", dh=200):
-        t = [[], [], [], []]
+        t = [[], [], [], [], []]
         color = ["red", "blue"]
         L = list(set(self.df["L"]))
         for l in L:
@@ -729,16 +730,17 @@ class Analysis:
                 a, b = np.histogram(cc[ch], dh)
                 tm[ch] = np.average(b[:-1], weights=a)
                 tm[2 + ch] = 1
-                t[ch].append(tm[ch])
-                t[2 + ch].append(tm[2 + ch])
+                t[0].append(l)
+                t[ch + 1].append(tm[ch])
+                t[ch + 3].append(tm[2 + ch])
                 # p, q = curve_fit(gauss_fit, b[:-1], a)
             if self.charts_path:
                 g1 = sns.histplot(
-                    x=cc[0], bins=dh, color=color[0], label=f"CH0", alpha=0.3
+                    x=cc[0], bins=dh, color=color[0], label="CH0", alpha=0.3
                 )
                 g1.axvline(tm[ch], ls="--", lw=2, c=color[0])
                 g2 = sns.histplot(
-                    x=cc[1], bins=dh, color=color[1], label=f"CH1", alpha=0.3
+                    x=cc[1], bins=dh, color=color[1], label="CH1", alpha=0.3
                 )
                 g2.axvline(tm[ch], ls="--", lw=2, c=color[1])
                 plt.title(f"L={l}cm")
