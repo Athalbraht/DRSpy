@@ -26,14 +26,17 @@ from scipy.special import erf
 sns.set_theme()
 
 
-class Analysis:
+class Analysis():
+    """Analysis class."""
+
     def __init__(
         self,
         data_path: str,
         limit_file: str | None = None,
         charts_path: str | None = None,
     ) -> None:
-        """
+        """Init.
+
         data_path:     path to folder with .root files
         limit_file:    path to .root file. Reading events from other files will be limited to limit_file size.
         charts_path:   path to plots output folder
@@ -183,7 +186,7 @@ class Analysis:
         )
 
     def toml_manager(self) -> None:
-        """Init and read config.toml"""
+        """Init and read config.toml."""
         print("->\tChecking config.toml...")
         self.config_path = Path(self.data_path.joinpath("config.toml"))
         if self.config_path.exists():
@@ -204,7 +207,7 @@ class Analysis:
     def decode_filename(
         self, filename: str, separator: str = "_", pos: int = 1
     ) -> float | bool:
-        """Extract position data from filename"""
+        """Extract position data from filename."""
         try:
             position = float(filename.split(separator)[pos])
             return position
@@ -213,7 +216,7 @@ class Analysis:
             return False
 
     def load_waveform(self, root_filename: Path) -> list[Any]:
-        """TMP"""
+        """TMP."""
         events = DigitizerEventData.create_from_file(root_filename)
         waveforms = []  # waveform[channel] = [waveforms list, amplitudes list]
         for channel in range(self.channels):
@@ -228,7 +231,7 @@ class Analysis:
         fit_func: Callable[[Any], float],
         wf_num: int = -1,
     ) -> pd.DataFrame:
-        """Load waveforms from self.data_path"""
+        """Load waveforms from self.data_path."""
         evt_counter = 0
         p_list = [[] for _ in range(len(self.df_cols))]  # params & cov list
         q_list = [[] for _ in range(len(self.df_cols))]
@@ -285,7 +288,9 @@ class Analysis:
 
     def prepare(self, raw_df: pd.DataFrame | str) -> tuple[pd.DataFrame]:
         """Filter raw DataFrame and extract only useful entries.
-        The method generates filtered df with relative errors, groups by event and source position (ddf) and
+
+        The method generates filtered df with relative errors, groups by
+        event and source position (ddf) and
         """
         print("->\tCreating DataFrame")
         if isinstance(raw_df, str):
