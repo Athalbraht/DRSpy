@@ -26,7 +26,7 @@ from scipy.special import erf
 sns.set_theme()
 
 
-class Analysis():
+class Analysis:
     """Analysis class."""
 
     def __init__(

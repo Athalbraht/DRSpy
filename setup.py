@@ -12,9 +12,6 @@ setup(
     license="MIT",
     requires=deps,
     install_requires=deps,
-    packages=['DRSpy', 'DRSpy.plugins'],
-    entry_points={
-        'console_scripts': ['drspy = DRSpy.main:main']
-    }
+    packages=["DRSpy", "DRSpy.plugins"],
+    entry_points={"console_scripts": ["drspy = DRSpy.main:main"]},
 )
-
