@@ -1,10 +1,9 @@
-import numpy as np
 import matplotlib
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+
 import DRSpy.optimize as optim
 import DRSpy.visual as vis
-
 from DRSpy.data_struct import click, log
 
 matplotlib.use("Agg")

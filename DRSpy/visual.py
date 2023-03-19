@@ -1,7 +1,6 @@
-from DRSpy.analysis import np, plt
-from DRSpy.analysis import matplotlib
-
 from abc import ABC, abstractmethod
+
+from DRSpy.analysis import matplotlib, np, plt
 
 
 class Figure(ABC):

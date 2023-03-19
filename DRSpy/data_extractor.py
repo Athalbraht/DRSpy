@@ -1,7 +1,8 @@
-import xml.etree.ElementTree as ET
 import json
-import pandas as pd
+import xml.etree.ElementTree as ET
 from os import sep
+
+import pandas as pd
 
 
 class DataExtractor(object):

@@ -1,5 +1,6 @@
-from DRSpy.analysis import np
 from scipy.optimize import curve_fit
+
+from DRSpy.analysis import np
 
 ####### Func
 

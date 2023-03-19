@@ -1,13 +1,14 @@
 import os
-import numpy as np
+from sys import argv
 
+import numpy as np
 # import matplotlib.pyplot as plt
 import pandas as pd
-from sys import argv
-from DRSpy.visual import *
 from scipy.optimize import curve_fit
-from DRSpy.optimize import inspector_calib, fit
+
 from DRSpy.data_struct import log
+from DRSpy.optimize import fit, inspector_calib
+from DRSpy.visual import *
 
 
 class InSpector:

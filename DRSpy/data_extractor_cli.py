@@ -1,7 +1,8 @@
 import argparse
-from data_extractor import DataExtractor
-from os import path, listdir, sep
+from os import listdir, path, sep
 from time import time
+
+from data_extractor import DataExtractor
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-v", "--verbose", help="Turns verbose output", action="store_true")

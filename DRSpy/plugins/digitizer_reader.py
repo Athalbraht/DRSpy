@@ -2,7 +2,6 @@ from dataclasses import dataclass, field
 from itertools import cycle
 
 import numpy as np
-
 # import scipy.signal
 import uproot
 

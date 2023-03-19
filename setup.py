@@ -1,5 +1,6 @@
-import DRSpy
 from setuptools import setup
+
+import DRSpy
 
 deps = ["click", "pandas", "matplotlib", "scipy"]
 

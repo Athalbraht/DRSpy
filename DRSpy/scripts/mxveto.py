@@ -3,7 +3,6 @@ from __future__ import annotations
 __version__ = "v0.1"
 
 import inspect
-
 # import os
 from pathlib import Path
 from sys import argv
@@ -16,12 +15,12 @@ import numpy.typing as npt
 import pandas as pd
 import seaborn as sns
 import toml
-from DRSpy.plugins.digitizer_reader import DigitizerEventData
-
 # from scipy import stats
 # from digitizer_reader import *
 from scipy.optimize import curve_fit
 from scipy.special import erf
+
+from DRSpy.plugins.digitizer_reader import DigitizerEventData
 
 sns.set_theme()
 
