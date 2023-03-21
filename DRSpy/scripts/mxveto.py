@@ -3,6 +3,7 @@ from __future__ import annotations
 __version__ = "v0.1"
 
 import inspect
+
 # import os
 from pathlib import Path
 from sys import argv
@@ -15,6 +16,7 @@ import numpy.typing as npt
 import pandas as pd
 import seaborn as sns
 import toml
+
 # from scipy import stats
 # from digitizer_reader import *
 from scipy.optimize import curve_fit
@@ -260,10 +262,46 @@ class Analysis:
                         p, q = self.get_waveform_fit(
                             fit_func, waveforms[channel][nevt].waveform
                         )
+                        func = fit_func(self.t, *p)
                         for i in range(len(p)):
-                            p_list[
-                                i + len(self.df_cols) - len(self.df_cols_sigma)
-                            ].append(p[i])
+                            if i == 1:
+                                try:
+                                    mx = 0.8 * (func[np.argmin(func)] - func[np.where(self.t >= p[0])[0][0]])
+                                    mn = 0.2 * (func[np.argmin(func)] - func[np.where(self.t >= p[0])[0][0]])
+                                    rx = np.where(func<mx)[0][0]
+                                    rn = np.where(func<mn)[0][0]
+                                    rising = rx-rn
+                                    p_list[
+                                        i + len(self.df_cols) - len(self.df_cols_sigma)
+                                    ].append(rising)
+
+                                except Exception as e:
+                                    print(f"cant find mx/mn {e}")
+                                    p_list[
+                                        i + len(self.df_cols) - len(self.df_cols_sigma)
+                                    ].append(np.nan)
+
+                            if i == 2:
+                                try:
+                                    mx = 0.8 * (func[np.argmin(func)] - func[np.where(self.t >= p[0])[0][0]])
+                                    mn = 0.2 * (func[np.argmin(func)] - func[np.where(self.t >= p[0])[0][0]])
+                                    fx = np.where(func<mx)[0][-1]
+                                    fn = np.where(func<mn)[0][-1]
+                                    falling = fx-fn
+                                    p_list[
+                                        i + len(self.df_cols) - len(self.df_cols_sigma)
+                                    ].append(falling)
+
+                                except Exception as e:
+                                    print(f"cant find mx/mn {e}")
+                                    p_list[
+                                        i + len(self.df_cols) - len(self.df_cols_sigma)
+                                    ].append(np.nan)
+
+                            if i != 1 and i != 2:
+                                p_list[
+                                    i + len(self.df_cols) - len(self.df_cols_sigma)
+                                ].append(p[i])
                             q_list[i].append(np.sqrt(np.diag(q))[i])
                     if plot_counter != 0:
                         plot_counter -= 1
@@ -296,7 +334,7 @@ class Analysis:
             self.df = pd.read_csv(raw_df)
         else:
             self.df = pd.DataFrame(raw_df)
-        dcol = ["event", "t_0", "L", "Q", "A"]
+        dcol = ["event", "t_0", "L", "Q", "A", "timestamp"]
         print("->\tClearing nan and inf values")
         self.df.replace([np.inf, -np.inf], np.nan, inplace=True)
         self.df.dropna(inplace=True)
@@ -351,7 +389,7 @@ class Analysis:
         self.ddf = self.df[self.df["CH"] == 0][dcol].merge(
             self.df[self.df["CH"] == 1][dcol],
             how="inner",
-            on=["event", "L"],
+            on=["event", "L", "timestamp"],
             suffixes=["_ch0", "_ch1"],
         )
         self.ddf[self.ddf_cols[8]] = self.ddf.apply(
@@ -719,6 +757,16 @@ def asymgauss_fit(x, m1, m0, m2, m3):
     return amp * spread * skew
 
 
+def asymgauss_fit2(x, m1, m0, m2, m3, n1, n0, n2, n3):
+    amp = m0 / (m2 * np.sqrt(2 * np.pi))
+    spread = np.exp((-((x - m1) ** 2)) / (2 * m2**2))
+    skew = 1 + erf((m3 * (x - m1)) / (m2 * np.sqrt(2)))
+    amp2 = n0 / (n2 * np.sqrt(2 * np.pi))
+    spread2 = np.exp((-((x - n1) ** 2)) / (2 * n2**2))
+    skew2 = 1 + erf((n3 * (x - n1)) / (n2 * np.sqrt(2)))
+    return (amp * spread * skew) + (amp2 + spread2 + skew2)
+
+
 def lin_fit(x, a, b):
     return a * x + b
 
@@ -728,6 +776,19 @@ def landau_fit(x, E, S, N):
 
 
 def sig_fit(t, t0, t_r, t_f, Q, dV, V0=0):
+    return (
+        V0
+        + dV * t
+        + np.heaviside(t - t0, 0)
+        * Q
+        / (t_r - t_f)
+        * (np.exp(-(t - t0) / t_r) - np.exp(-(t - t0) / t_f))
+    )
+
+
+
+
+def sig_fit2(t, t0, t_r, t_f, Q, dV, V0=0):
     return (
         V0
         + dV * t
