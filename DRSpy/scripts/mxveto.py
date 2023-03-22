@@ -287,7 +287,7 @@ class Analysis:
                                     mn = 0.2 * (func[np.argmin(func)] - func[np.where(self.t >= p[0])[0][0]])
                                     fx = np.where(func<mx)[0][-1]
                                     fn = np.where(func<mn)[0][-1]
-                                    falling = fx-fn
+                                    falling = fn-fx
                                     p_list[
                                         i + len(self.df_cols) - len(self.df_cols_sigma)
                                     ].append(falling)
