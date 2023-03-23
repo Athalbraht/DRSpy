@@ -373,6 +373,7 @@ class Analysis:
         for i in tmp.keys():
             self.df[i] = tmp[i]
 
+        '''
         print("->\tFiltering df data...")
         self.df = self.df[
             (self.df["t_r"] > 0)
@@ -384,6 +385,7 @@ class Analysis:
             & (self.df["Q"] <= 0)
             & (self.df["Q"] > -5)
         ]
+        '''
 
         print("->\tCalculating asymmeties")
         self.ddf = self.df[self.df["CH"] == 0][dcol].merge(
@@ -414,10 +416,11 @@ class Analysis:
             lambda x: (x.A_ch0 - x.A_ch1) / (x.A_ch0 + x.A_ch1), axis=1
         )
         print("->\tFiltering ddf data...")
+        '''
         self.ddf = self.ddf[
             (np.abs(self.ddf["asymQ"]) < 4) & (np.abs(self.ddf["lnQ"])) < 4
         ]
-
+        '''
         # col = ["t_0", "t_r", "t_f", "Q", "A", "V_0", "dV"]
         # hcol = ["t_r", "t_f", "Q", "A", "V_0", "dV"]
         # tt = [[] for i in range(len(col))]
@@ -804,7 +807,21 @@ if __name__ == "__main__":
     print("Usage: python analysis.py <data_folder>")
     run = Analysis(argv[1], charts_path=argv[3], limit_file=argv[2])
     df = pd.read_csv(argv[4])
-    run.df = df[df["Q"] > -1.2]
+    run.df = df
+    run.df.dropna(inplace=True)
+    run.df.reset_index(inplace=True, drop=True)
+    run.df = run.df[np.abs(run.df["t_r"])<15]
+    run.df = run.df[np.abs(run.df["t_f"])<60]
+    run.df = run.df[(run.df["t_0"] > 30) & (run.df['t_0'] < 52) ]
+    run.df = run.df[(run.df["V_0"] > -0.005) & (run.df['V_0'] < 0.0075) ]
+    run.df = run.df[(run.df["V_0"] > -0.037) & (run.df['V_0'] < 0.0011) ]
+    run.df = run.df[(run.df["dV"] > -5.2e-5) & (run.df['dV'] < 0.00022) ]
+    run.df = run.df[(run.df["Q"] > -2) & (run.df['Q'] < 0) ]
+    run.df = run.df[(run.df["A"] < 1.5)]
+    run.prepare(run.df)
+    run.ddf = run.ddf[(run.ddf["lnQ"] > -6) & (run.df['lnQ'] < 6) ]
+
+
     run.chart_ext = ".png"
 
     # dff = run.load_waveforms(run.decode_filename, sig_fit)
@@ -812,3 +829,4 @@ if __name__ == "__main__":
     # run.plot_lin(lin_fit)
     # run.plot_signal(lin_fit)
     # run.plot_joint()
+    
