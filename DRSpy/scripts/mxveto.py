@@ -3,8 +3,7 @@ from __future__ import annotations
 __version__ = "v0.1"
 
 import inspect
-
-# import os
+import os
 from pathlib import Path
 from sys import argv
 from typing import Any, Callable
@@ -161,17 +160,17 @@ class Analysis:
             "$t_0^{CH0}$ [ns]",
             "$t_0^{CH1}$ [ns]",
             "L [cm]",
-            "$Q^{CH0}$",
-            "$Q^{CH1}$",
+            "$Q_{CH0}$",
+            "$Q_{CH1}$",
             "Amp. CH0 [V]",
             "Amp. CH1 [V]",
-            "$t_1^{CH1} - t_0^{CH0}$",
-            "$\ln{\\frac{Q_1}{Q_0}}$",
-            "$\sqrt{Q_0Q_1}$",
-            "$\\frac{Q_0-Q_1}{Q_1+Q_1}$",
-            "$\ln{\\frac{A_1}{A_0}}$",
-            "$\sqrt{A_0A_1}$",
-            "$\\frac{A_0-A_1}{A_1+A_1}$",
+            "$t_0^{CH1} - t_0^{CH0}$",
+            "$\ln{\\frac{Q_{CH1}}{Q_{CH0}}}$",
+            "$\sqrt{Q_{CH0}Q_{CH1}}$",
+            "$\\frac{Q_{CH0}-Q_{CH1}}{Q_{CH0}+Q_{CH1}}$",
+            "$\ln{\\frac{A_{CH1}}{A_{CH0}}}$",
+            "$\sqrt{A_{CH0}A_{CH1}}$",
+            "$\\frac{A_{CH0}-A_{CH1}}{A_{CH0}+A_{CH1}}$",
         ]
         # change default df column names to LaTEX
         self.lx = dict(
@@ -339,7 +338,7 @@ class Analysis:
         self.df.replace([np.inf, -np.inf], np.nan, inplace=True)
         self.df.dropna(inplace=True)
         self.df.reset_index(inplace=True, drop=True)
-
+        '''
         print("->\tCalculating rel error")
         tmp = [[] for i in range(len(self.df_cols_sigma) - 1)]
         with click.progressbar(range(len(self.df))) as bar:
@@ -370,8 +369,10 @@ class Analysis:
                 tmp,
             )
         )
+        
         for i in tmp.keys():
             self.df[i] = tmp[i]
+        '''
 
         '''
         print("->\tFiltering df data...")
@@ -810,20 +811,144 @@ if __name__ == "__main__":
     run.df = df
     run.df.dropna(inplace=True)
     run.df.reset_index(inplace=True, drop=True)
+    run.df['t_f'] = run.df['t_f'].apply(lambda x: np.abs(x))
     run.df = run.df[np.abs(run.df["t_r"])<15]
+    run.df = run.df[np.abs(run.df["t_f"])>7]
     run.df = run.df[np.abs(run.df["t_f"])<60]
-    run.df = run.df[(run.df["t_0"] > 30) & (run.df['t_0'] < 52) ]
+    run.df = run.df[(run.df["t_0"] > 30) & (run.df['t_0'] < 60) ]
     run.df = run.df[(run.df["V_0"] > -0.005) & (run.df['V_0'] < 0.0075) ]
     run.df = run.df[(run.df["V_0"] > -0.037) & (run.df['V_0'] < 0.0011) ]
     run.df = run.df[(run.df["dV"] > -5.2e-5) & (run.df['dV'] < 0.00022) ]
     run.df = run.df[(run.df["Q"] > -2) & (run.df['Q'] < 0) ]
     run.df = run.df[(run.df["A"] < 1.5)]
     run.prepare(run.df)
-    run.ddf = run.ddf[(run.ddf["lnQ"] > -6) & (run.df['lnQ'] < 6) ]
+    run.ddf = run.ddf[(run.ddf["lnQ"] > -5) & (run.ddf['lnQ'] < 5) ]
+    run.ddf = run.ddf[(run.ddf["dt"] > -8) & (run.ddf['dt'] < 8) ]
+    run.ddf = run.ddf[(run.ddf["sqrtQ"] < 0.6)]
+    #exclude
+    ddff = run.ddf[(run.ddf['L'] < 0) | ((run.ddf['L'] >= 22 ) & (run.ddf['L'] <= 24)) | ((run.ddf['L'] >= 38) & (run.ddf['L'] <= 44) )]
+
+    ext = 'png'
+
+    #########################
+    def plot_2h(data,lx, ly, fit=None, bins=100, type='simple', by='L', hue=None, col=None, appx='' ):
+        data = data.rename(columns = run.lx)
+        lxx = lx
+        lyy = ly
+        col = run.lx.get(col,None)
+        hue = run.lx.get(hue,None)
+        byy = by
+        by = run.lx.get(by,'L')
+        lx = run.lx[lx]
+        ly = run.lx[ly]
+        sns.jointplot(data=data, x=lx, y=ly,kind='hist', cmap='turbo')
+        plt.savefig(f'{appx}{lxx}-{lyy}.{ext}'); plt.clf(); plt.cla()
+        
+        if type == 'simple':
+            x = np.histogram(data[ly],bins=bins,density=True)
+            tt = np.linspace(x[1][0],x[1][-1],1000)
+            p,q = curve_fit(fit,x[1][1::],x[0], p0=[34,1,1])
+            print(f'{ly} = {round(p[0],2)} +- {round(np.sqrt(np.diag(q))[0],2)}')
+            sns.histplot(data=data, x=ly, bins=bins,stat='probability')
+            sns.lineplot(x=tt, y=fit(tt,*p))
+            plt.savefig(f'{appx}{lyy}.{ext}'); plt.clf(); plt.cla()
+
+            x = np.histogram(data[lx],bins=bins,density=True)
+            tt = np.linspace(x[1][0],x[1][-1],1000)
+            p,q = curve_fit(fit,x[1][1::],x[0])
+            print(f'{lx} = {round(p[0],2)} +- {round(np.sqrt(np.diag(q))[0],2)}')
+            sns.histplot(data=data, x=lx, bins=bins,stat='probability')
+            sns.lineplot(x=tt, y=fit(tt,*p))
+            plt.savefig(f'{appx}{lxx}.{ext}'); plt.clf(); plt.cla()
+        if type == 'disNF':
+            sns.displot(data=data, x=lx, y=ly,col=col,hue=hue,cmap='turbo',cbar=True)
+            plt.savefig(f'{appx}{lxx}-{lyy}-displot.{ext}'); plt.clf(); plt.cla()
+        if type=='multiNF':
+            for i in list(set(data[by])):
+                sns.displot(data=data[data[by]==i], col=col, hue=hue, x=lx)
+                os.system(f'mkdir {appx}{lxx}-{byy} 2>/dev/null')
+                plt.title(f"{by}={i}")
+                plt.savefig(f'{appx}{lxx}-{byy}/{lxx}-{by}{i}.{ext}'); plt.clf(); plt.cla()
+        if type=='multi':
+            for i in list(set(data[by])):
+                sns.displot(data=data[data[by==i]], col=col, hue=hue, x=lx)
+                os.system(f'mkdir {appx}fit-{lxx}-{byy} 2>/dev/null')
+                plt.savefig(f'{appx}fit-{lxx}-{byy}/{lxx}-{by}{i}.{ext}'); plt.clf(); plt.cla()
+        if type=='linfit':
+            data2 = data[(data['L [cm]'] < 0) | ((data['L [cm]'] >= 22 ) & (data['L [cm]'] <= 24)) | ((data['L [cm]'] >= 38) & (data['L [cm]'] <= 44) )]
+            gr = data2.groupby(lx).mean().reset_index()
+            sgr = data2.groupby(lx).std().reset_index()
+            tt = np.linspace(gr[lx].min(),gr[lx].max(),1000)
+            p,q = curve_fit(fit,gr[lx], gr[ly])
+            print(f'{ly}({lx}) a  = {round(p[0],2)} +- {round(np.sqrt(np.diag(q))[0],2)}')
+            sns.histplot(data=data, x=lx, y=ly,cmap='turbo',cbar=True)
+            sns.lineplot(x=tt, y=fit(tt,*p))
+            plt.savefig(f'{appx}fit-{lyy}({lxx}).{ext}'); plt.clf(); plt.cla()
+
+
+    if len(set(run.df['L'])) < 5:
+        lab = {'-1':'cosmic-night','-2':'doubleScint','-3':'cosmic2'}
+        for i in list(set(run.df['L'])):
+
+            plot_2h(run.ddf[run.ddf['L']==i],appx=lab[str(int(i))], lx='dt', ly='asymQ', type='disNF')
+            plot_2h(run.ddf[run.ddf['L']==i],appx=lab[str(int(i))], lx='dt', ly='lnQ', type='disNF')
+            plot_2h(run.ddf[run.ddf['L']==i],appx=lab[str(int(i))], lx='dt', ly='sqrtQ', type='disNF')
+
+            
+            plot_2h(run.df[run.df['L']==i],appx=lab[str(int(i))], lx='t_r', ly='t_f', fit=gauss_fit, bins=100, type='simple')
+            plot_2h(run.df[run.df['L']==i],appx=lab[str(int(i))], lx='A', ly='Q', type='disNF',col='CH')
+            plot_2h(run.df[run.df['L']==i],appx=lab[str(int(i))], lx='t_0', ly='Q', type='disNF',col='CH')
+            plot_2h(run.df[run.df['L']==i],appx=lab[str(int(i))], lx='t_0', ly='A', type='disNF',col='CH')
+            plot_2h(run.df[run.df['L']==i],appx=lab[str(int(i))], lx='A', ly='Q', type='multiNF', by='L', col='CH')
+            plot_2h(run.df[run.df['L']==i],appx=lab[str(int(i))], lx='Q', ly='A', type='multiNF', by='L', col='CH')
+            plot_2h(run.df[run.df['L']==i],appx=lab[str(int(i))], lx='t_0', ly='A', type='multiNF', by='L', col='CH')
+            plot_2h(run.df[run.df['L']==i],appx=lab[str(int(i))], lx='t_f', ly='A', type='multiNF', by='L', col='CH')
+            plot_2h(run.df[run.df['L']==i],appx=lab[str(int(i))], lx='t_r', ly='A', type='multiNF', by='L', col='CH')
+            plot_2h(run.df[run.df['L']==i],appx=lab[str(int(i))], lx='t_r', ly='A', type='disNF',col='CH')
+            plot_2h(run.df[run.df['L']==i],appx=lab[str(int(i))], lx='t_f', ly='A', type='disNF',col='CH')
+        exit()
+
+    #########################
+    plot_2h(run.ddf, lx='dt', ly='L', type='multiNF', by='L')
+    plot_2h(run.ddf, lx='lnQ', ly='L', type='multiNF', by='L')
+    plot_2h(run.ddf, lx='sqrtQ', ly='L', type='multiNF', by='L')
+    plot_2h(run.ddf, lx='asymQ', ly='L', type='multiNF', by='L')
+
+    plot_2h(run.ddf, lx='L', ly='dt', type='linfit',fit=lin_fit)
+    plot_2h(run.ddf, lx='L', ly='lnQ', type='linfit',fit=lin_fit)
+    plot_2h(run.ddf, lx='L', ly='dt', type='disNF')
+    plot_2h(run.ddf, lx='L', ly='lnQ', type='disNF')
+    plot_2h(run.ddf, lx='L', ly='sqrtQ', type='disNF')
+    plot_2h(run.ddf, lx='L', ly='asymQ', type='disNF')
+    plot_2h(run.ddf, lx='dt', ly='asymQ', type='disNF')
+    plot_2h(run.ddf, lx='dt', ly='sqrtQ', type='disNF')
+    plot_2h(run.ddf, lx='dt', ly='lnQ', type='disNF')
+
+
+    plot_2h(run.df, lx='t_r', ly='t_f', fit=gauss_fit, bins=100, type='simple')
+    plot_2h(run.df, lx='A', ly='Q', type='disNF',col='CH')
+    plot_2h(run.df, lx='t_0', ly='Q', type='disNF',col='CH')
+    plot_2h(run.df, lx='t_0', ly='A', type='disNF',col='CH')
+    plot_2h(run.df, lx='A', ly='Q', type='multiNF', by='L', col='CH')
+    plot_2h(run.df, lx='Q', ly='A', type='multiNF', by='L', col='CH')
+    plot_2h(run.df, lx='t_0', ly='A', type='multiNF', by='L', col='CH')
+    plot_2h(run.df, lx='t_f', ly='A', type='multiNF', by='L', col='CH')
+    plot_2h(run.df, lx='t_r', ly='A', type='multiNF', by='L', col='CH')
+    plot_2h(run.df, lx='t_r', ly='A', type='disNF',col='CH')
+    plot_2h(run.df, lx='t_f', ly='A', type='disNF',col='CH')
+
+
+
+
+
+
+
+
+
+
 
 
     run.chart_ext = ".png"
-
     # dff = run.load_waveforms(run.decode_filename, sig_fit)
     # run.prepare(dff)
     # run.plot_lin(lin_fit)
