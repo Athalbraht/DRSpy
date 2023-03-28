@@ -345,7 +345,9 @@ class Analysis:
             self.df = pd.read_csv(raw_df)
         else:
             self.df = pd.DataFrame(raw_df)
-        dcol = ["event", "t_0", "L", "Q", "A", "timestamp"]
+        c = 14.7
+        self.df["Lr"] = 95 / 2 + run.df["L"] * (-1) ** run.df["CH"]
+        dcol = ["event", "t_0", "L", "Q", "A", "timestamp", "Lr"]
         print("->\tClearing nan and inf values")
         self.df.replace([np.inf, -np.inf], np.nan, inplace=True)
         self.df.dropna(inplace=True)
