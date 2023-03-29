@@ -793,6 +793,27 @@ def landau_fit(x, E, S, N):
     return N / np.sqrt(2 * np.pi) * np.exp((((E - x) / S) - np.exp(-((x - E) / S))) / 2)
 
 
+# https://www.osti.gov/servlets/purl/1800941
+def wf_f(t, t0, tr):
+    return 1 / (np.exp(-(t - t0) / tr) + 1)
+
+
+def wf_g(t, t0, tf):
+    return 1 / (np.exp((t - t0) / tf) + 1)
+
+
+def wf_h(t, t0, ts):
+    return 1 / (np.exp((t - t0) / ts) + 1)
+
+
+def wf_fit(t, t0, tr, tf, ts, Q, R=1, dV=0, V0=0):
+    return (
+        Q * wf_f(t, t0, tr) * (wf_g(t, t0, tf) + (1 - R) * wf_h(t, t0, ts))
+        + V0
+        + dV * t
+    )
+
+
 def sig_fit(t, t0, t_r, t_f, Q, dV, V0=0):
     return (
         V0
