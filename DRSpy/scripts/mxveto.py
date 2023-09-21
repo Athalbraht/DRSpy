@@ -406,7 +406,7 @@ class Analysis:
         self.ddf = self.df[self.df["CH"] == 0][dcol].merge(
             self.df[self.df["CH"] == 1][dcol],
             how="inner",
-            on=["event", "L", "timestamp"],
+            on=["event", "L"],
             suffixes=["_ch0", "_ch1"],
         )
         self.ddf[self.ddf_cols[8]] = self.ddf.apply(
@@ -855,6 +855,7 @@ if __name__ == "__main__":
     run.df = run.df[(run.df["Q"] > -2) & (run.df["Q"] < 0)]
     run.df = run.df[(run.df["A"] < 1.5)]
     run.prepare(run.df)
+    ddf = run.ddf.copy()
     run.ddf = run.ddf[(run.ddf["lnQ"] > -5) & (run.ddf["lnQ"] < 5)]
     run.ddf = run.ddf[(run.ddf["dt"] > -8) & (run.ddf["dt"] < 8)]
     run.ddf = run.ddf[(run.ddf["sqrtQ"] < 0.6)]

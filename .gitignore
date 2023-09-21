@@ -1,3 +1,4 @@
+*.root
 # Python build
 *venv*
 *.pyc
